@@ -344,7 +344,8 @@ function onDrag(e: MouseEvent) {
   startX = e.clientX
   startY = e.clientY
 
-  window.electronAPI.moveWindow(deltaX, deltaY)
+  // 只移动窗口位置，不改变大小
+  window.electronAPI.moveWindow(0, 0)
 }
 
 function stopDrag() {

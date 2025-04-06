@@ -63,7 +63,13 @@ const api = {
     return () => ipcRenderer.removeListener('auto-generate', callback)
   },
   closePopup: () => ipcRenderer.send('close-popup'),
-  moveWindow: (deltaX: number, deltaY: number) => ipcRenderer.send('resize-window', { width: deltaX, height: deltaY })
+  moveWindow: (deltaX: number, deltaY: number) => {
+    // 获取当前窗口大小
+    const currentWindow = require('@electron/remote').getCurrentWindow()
+    const [width, height] = currentWindow.getSize()
+    // 发送调整大小的消息
+    ipcRenderer.send('resize-window', { width, height })
+  }
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

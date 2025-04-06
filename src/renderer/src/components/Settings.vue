@@ -149,11 +149,9 @@
                     <el-input
                       v-model="prompt.title"
                       class="prompt-title-input"
-                      :disabled="prompt.isDefault"
                       placeholder="输入人设名称"
                     />
                     <el-button
-                      v-if="!prompt.isDefault"
                       type="danger"
                       link
                       @click="deletePrompt(key)"
@@ -164,7 +162,6 @@
                 </template>
                 <el-input
                   v-model="prompt.content"
-                  :disabled="prompt.isDefault"
                   type="textarea"
                   :rows="4"
                   class="prompt-input"
@@ -518,14 +515,13 @@ const saveSettings = async () => {
 
 // 重置提示词
 const resetPrompts = () => {
-  const defaultPrompts: Record<string, Prompt> = {
+  settings.value.prompts = {
     '智能助手': {
       title: '智能助手',
       content: '你现在是一位专业、友善的智能助手，擅长处理各种类型的对话。请用得体、专业但不失温度的语言回复以下内容。注意措辞要准确、积极向上、富有建设性，同时也要体现出对他人的尊重和理解。',
       isDefault: true
     }
   }
-  settings.value.prompts = { ...defaultPrompts }
   ElMessage.success('已恢复默认提示词')
 }
 
@@ -541,11 +537,15 @@ const addNewPrompt = () => {
 
 // 删除人设
 const deletePrompt = (key: string) => {
-  const prompt = settings.value.prompts[key]
-  if (prompt && !prompt.isDefault) {
-    delete settings.value.prompts[key]
-    ElMessage.success('删除成功')
+  // 确保至少保留一个人设
+  const promptCount = Object.keys(settings.value.prompts).length
+  if (promptCount <= 1) {
+    ElMessage.warning('至少需要保留一个人设')
+    return
   }
+  
+  delete settings.value.prompts[key]
+  ElMessage.success('删除成功')
 }
 
 // 窗口控制函数

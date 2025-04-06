@@ -471,24 +471,19 @@ ipcMain.handle('check-for-updates', async () => {
 // 调整窗口大小
 ipcMain.on('resize-window', (_, { width, height }) => {
   if (popupWindow) {
-    // 限制最小和最大尺寸
-    const newWidth = Math.min(Math.max(width, 400), 600)
-    const newHeight = Math.min(Math.max(height + 16, 300), 800) // 添加一些额外空间
+    // 设置固定大小
+    const fixedWidth = 600
+    const fixedHeight = 600
 
     // 获取当前窗口位置
     const [currentX, currentY] = popupWindow.getPosition()
-    const [currentWidth, currentHeight] = popupWindow.getSize()
-
-    // 计算新的位置，保持窗口中心点不变
-    const newX = currentX - Math.floor((newWidth - currentWidth) / 2)
-    const newY = currentY - Math.floor((newHeight - currentHeight) / 2)
 
     // 设置新的位置和大小
     popupWindow.setBounds({
-      x: newX,
-      y: newY,
-      width: newWidth,
-      height: newHeight
+      x: currentX,
+      y: currentY,
+      width: fixedWidth,
+      height: fixedHeight
     }, true) // true 表示使用动画效果
   }
 })
