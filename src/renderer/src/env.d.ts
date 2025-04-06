@@ -7,16 +7,20 @@ declare module '*.vue' {
   export default component
 }
 
+import type { ElectronAPI } from '../../types'
+
 interface Settings {
   apiKey?: string
   prompts?: Record<string, string>
 }
 
 interface Window {
-  electronAPI: {
-    getAIResponse: (text: string, persona: string) => Promise<string>
-    getSettings: () => Promise<Settings>
-    saveSettings: (settings: Settings) => Promise<void>
-    onSelectedText: (callback: (text: string) => void) => () => void
+  electronAPI: ElectronAPI
+  electron: {
+    process: {
+      versions: {
+        app: string
+      }
+    }
   }
 }

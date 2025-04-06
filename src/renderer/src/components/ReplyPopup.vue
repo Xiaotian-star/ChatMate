@@ -117,7 +117,13 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
-import type { Conversation } from '../../../types'
+import type { Conversation, ElectronAPI } from '../../../types'
+
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI
+  }
+}
 
 const selectedText = ref('')
 const selectedPersona = ref('职场精英')
@@ -266,12 +272,12 @@ async function getReply() {
   try {
     const response = await window.electronAPI.getAIResponse({
       text: selectedText.value,
-      persona: selectedPersona.value,
       conversationId: currentSessionId.value
     })
-    replies.value = Array.isArray(response) ? response : [response]
+    replies.value = response
   } catch (err) {
-    error.value = err instanceof Error ? err.message : '生成回复失败'
+    console.error('获取回复失败:', err)
+    error.value = err instanceof Error ? err.message : '获取回复失败'
   } finally {
     loading.value = false
   }
@@ -279,16 +285,12 @@ async function getReply() {
 
 // 选择回复并复制到剪贴板
 async function selectReply(reply: string, index: number) {
-  try {
-    await navigator.clipboard.writeText(reply)
+  navigator.clipboard.writeText(reply).then(() => {
     copiedIndex.value = index
     setTimeout(() => {
-      closePopup()
-    }, 500)
-  } catch (err) {
-    console.error('复制失败:', err)
-    error.value = '复制失败，请手动复制'
-  }
+      copiedIndex.value = -1
+    }, 2000)
+  })
 }
 
 // 关闭弹窗
@@ -316,10 +318,10 @@ function onDrag(e: MouseEvent) {
   const deltaX = e.clientX - startX
   const deltaY = e.clientY - startY
   
-  window.electronAPI.moveWindow(deltaX, deltaY)
-  
   startX = e.clientX
   startY = e.clientY
+
+  window.electronAPI.moveWindow(deltaX, deltaY)
 }
 
 function stopDrag() {
@@ -334,29 +336,24 @@ onUnmounted(() => {
 })
 
 // 删除会话
-function deleteSession(sessionId: string) {
+async function deleteSession(sessionId: string) {
   if (sessionId === 'default') return
   
-  // 如果删除的是当前会话，切换到默认会话
-  if (sessionId === currentSessionId.value) {
+  sessions.value = sessions.value.filter(s => s.id !== sessionId)
+  if (currentSessionId.value === sessionId) {
     currentSessionId.value = 'default'
   }
   
-  // 从会话列表中移除
-  sessions.value = sessions.value.filter(s => s.id !== sessionId)
-  
-  // 保存设置
-  window.electronAPI.getSettings()
-    .then(settings => {
-      return window.electronAPI.saveSettings({
-        ...settings,
-        conversations: sessions.value
-      })
+  try {
+    const settings = await window.electronAPI.getSettings()
+    await window.electronAPI.saveSettings({
+      ...settings,
+      conversations: sessions.value
     })
-    .catch(err => {
-      console.error('保存设置失败:', err)
-      error.value = '删除会话失败'
-    })
+  } catch (err) {
+    console.error('删除会话失败:', err)
+    error.value = '删除会话失败'
+  }
 }
 </script>
 

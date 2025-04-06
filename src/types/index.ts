@@ -1,40 +1,38 @@
 // 消息类型
 export interface Message {
-  role: string
+  role: 'user' | 'assistant'
   content: string
 }
 
-// 会话类型
+// 对话类型
 export interface Conversation {
   id: string
   title: string
-  messages: Array<{
-    role: string
-    content: string
-  }>
+  messages: Message[]
   lastUpdated: number
 }
 
 // 设置类型
 export interface Settings {
   apiKey: string
-  prompts: {
-    [key: string]: string
-  }
+  prompts: Record<string, string>
   shortcut: string
   conversations: Conversation[]
 }
 
 // 存储的设置类型
 export interface StoredSettings {
-  settings: Settings
+  apiKey: string
+  prompts: Record<string, string>
+  shortcut: string
+  conversations: Conversation[]
 }
 
-// AI请求参数类型
+// AI 请求参数类型
 export interface AIRequestParams {
   text: string
-  persona: string
   conversationId?: string
+  persona?: string
 }
 
 // 窗口命令类型
@@ -43,15 +41,21 @@ export type WindowCommand = 'minimize' | 'hide' | 'close-popup'
 // 渲染进程API类型
 export interface ElectronAPI {
   getAIResponse: (params: AIRequestParams) => Promise<string[]>
-  getSettings: () => Promise<Settings>
-  saveSettings: (settings: Settings) => Promise<boolean>
+  getSettings: () => Promise<StoredSettings>
+  saveSettings: (settings: StoredSettings) => Promise<boolean>
   onTextSelected: (callback: (text: string) => void) => () => void
+  onAutoGenerate: (callback: () => void) => () => void
   closePopup: () => void
   moveWindow: (deltaX: number, deltaY: number) => void
+  checkForUpdates: () => Promise<UpdateInfo>
 }
 
 // 更新信息类型
 export interface UpdateInfo {
   hasUpdate: boolean
-  version?: string
+  currentVersion: string
+  latestVersion: string
+  releaseNotes: string
+  downloadUrl: string
+  publishedAt: string
 } 

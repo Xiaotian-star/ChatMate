@@ -27,7 +27,6 @@
         <span>当前版本: v{{ currentVersion }}</span>
         <el-button 
           type="primary" 
-          link 
           :loading="checkingUpdate"
           @click="checkUpdate"
         >
@@ -77,7 +76,7 @@
         </div>
         
         <div class="prompts-grid">
-          <div v-for="[role, prompt] in Object.entries(settings.prompts || defaultPrompts)" 
+          <div v-for="[role] in Object.entries(settings.prompts || defaultPrompts)" 
                :key="role" 
                class="prompt-card">
             <div class="prompt-header">
@@ -105,7 +104,20 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Minus, Close } from '@element-plus/icons-vue'
-import type { Settings } from '@/types'
+import type { StoredSettings, ElectronAPI } from '../../../types'
+
+declare global {
+  interface Window {
+    electronAPI: ElectronAPI
+    electron: {
+      process: {
+        versions: {
+          app: string
+        }
+      }
+    }
+  }
+}
 
 // 预设的人设模板
 const defaultPrompts: Record<string, string> = {
@@ -126,10 +138,11 @@ const defaultPrompts: Record<string, string> = {
 const DEFAULT_SHORTCUT = 'F6'
 const DEFAULT_API_KEY = 'sk-b7d7735f91c64ebd9f8dd6b791ebcafb'
 
-const settings = ref<Settings>({
+const settings = ref<StoredSettings>({
   apiKey: DEFAULT_API_KEY,
   prompts: { ...defaultPrompts },
-  shortcut: DEFAULT_SHORTCUT
+  shortcut: DEFAULT_SHORTCUT,
+  conversations: []
 })
 
 // 快捷键录制相关
@@ -205,17 +218,50 @@ const resetShortcut = () => {
   ElMessage.success('已重置为默认快捷键')
 }
 
+// 版本和更新相关
+const currentVersion = ref(window.electron?.process?.versions?.app || '1.0.0')
+const checkingUpdate = ref(false)
+
+// 检查更新
+async function checkUpdate() {
+  try {
+    checkingUpdate.value = true
+    const updateInfo = await window.electronAPI.checkForUpdates()
+    
+    if (updateInfo.hasUpdate) {
+      ElMessage({
+        message: `发现新版本 ${updateInfo.latestVersion}，请前往下载页面更新`,
+        type: 'success',
+        duration: 5000,
+        showClose: true
+      })
+    } else {
+      ElMessage({
+        message: '当前已是最新版本',
+        type: 'info',
+        duration: 3000
+      })
+    }
+  } catch (error) {
+    console.error('检查更新失败:', error)
+    ElMessage.error('检查更新失败')
+  } finally {
+    checkingUpdate.value = false
+  }
+}
+
 // 加载设置
 const loadSettings = async () => {
   try {
     const savedSettings = await window.electronAPI.getSettings()
     console.log('加载到的设置:', savedSettings)
     
-    if (savedSettings?.settings) {
+    if (savedSettings) {
       settings.value = {
-        apiKey: savedSettings.settings.apiKey || DEFAULT_API_KEY,
-        prompts: savedSettings.settings.prompts || { ...defaultPrompts },
-        shortcut: savedSettings.settings.shortcut || DEFAULT_SHORTCUT
+        apiKey: savedSettings.apiKey || DEFAULT_API_KEY,
+        prompts: savedSettings.prompts || { ...defaultPrompts },
+        shortcut: savedSettings.shortcut || DEFAULT_SHORTCUT,
+        conversations: savedSettings.conversations || []
       }
       displayShortcut.value = settings.value.shortcut
     } else {
@@ -223,7 +269,8 @@ const loadSettings = async () => {
       settings.value = {
         apiKey: DEFAULT_API_KEY,
         prompts: { ...defaultPrompts },
-        shortcut: DEFAULT_SHORTCUT
+        shortcut: DEFAULT_SHORTCUT,
+        conversations: []
       }
       displayShortcut.value = DEFAULT_SHORTCUT
     }
@@ -233,7 +280,8 @@ const loadSettings = async () => {
     settings.value = {
       apiKey: DEFAULT_API_KEY,
       prompts: { ...defaultPrompts },
-      shortcut: DEFAULT_SHORTCUT
+      shortcut: DEFAULT_SHORTCUT,
+      conversations: []
     }
     displayShortcut.value = DEFAULT_SHORTCUT
     
@@ -249,94 +297,33 @@ const loadSettings = async () => {
 // 保存设置
 const saveSettings = async () => {
   try {
-    // 验证设置
-    if (!settings.value.shortcut) {
-      throw new Error('快捷键不能为空')
-    }
-    if (!settings.value.apiKey) {
-      throw new Error('API Key不能为空')
-    }
-
-    // 创建要保存的设置对象
-    const settingsToSave = {
-      settings: {
-        apiKey: settings.value.apiKey,
-        prompts: settings.value.prompts || {},
-        shortcut: settings.value.shortcut
-      }
-    }
-    
-    console.log('准备保存的设置:', JSON.stringify(settingsToSave))
-    await window.electronAPI.saveSettings(settingsToSave)
-    
-    ElMessage({
-      message: '设置已保存，新的快捷键已生效',
-      type: 'success',
-      duration: 2000,
-      showClose: true
-    })
+    await window.electronAPI.saveSettings(settings.value)
+    ElMessage.success('设置已保存')
   } catch (error) {
     console.error('保存设置失败:', error)
-    ElMessage({
-      message: error instanceof Error ? error.message : '保存设置失败，请重试',
-      type: 'error',
-      duration: 3000,
-      showClose: true
-    })
+    ElMessage.error('保存设置失败')
   }
 }
 
-// 恢复默认人设
+// 重置提示词
 const resetPrompts = () => {
   settings.value.prompts = { ...defaultPrompts }
-  ElMessage.success('已恢复默认人设')
+  ElMessage.success('已恢复默认提示词')
 }
 
-// 窗口控制
+// 最小化窗口
 const minimizeWindow = () => {
-  window.electron.ipcRenderer.send('window-control', 'minimize')
+  window.electronAPI.closePopup()
 }
 
+// 关闭窗口
 const closeWindow = () => {
-  window.electron.ipcRenderer.send('window-control', 'hide')
+  window.electronAPI.closePopup()
 }
 
-// 版本和更新相关
-const currentVersion = ref('1.0.0') // 当前版本号
-const checkingUpdate = ref(false)
-
-// 检查更新
-async function checkUpdate() {
-  if (checkingUpdate.value) return
-  
-  checkingUpdate.value = true
-  try {
-    const result = await window.electronAPI.checkForUpdates()
-    if (result.hasUpdate) {
-      ElMessage({
-        message: `发现新版本 v${result.version}，请前往 GitHub 下载更新`,
-        type: 'success',
-        duration: 5000,
-        showClose: true
-      })
-    } else {
-      ElMessage({
-        message: '当前已是最新版本',
-        type: 'success',
-        duration: 3000
-      })
-    }
-  } catch (error) {
-    ElMessage.error('检查更新失败，请稍后重试')
-  } finally {
-    checkingUpdate.value = false
-  }
-}
-
-onMounted(() => {
-  loadSettings()
-  // 获取当前版本号
-  currentVersion.value = window.electron.process.versions.app
+// 组件挂载时加载设置
+onMounted(async () => {
+  await loadSettings()
 })
 </script>
 
@@ -501,10 +488,7 @@ onMounted(() => {
 .version-info {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 8px;
+  gap: 16px;
   margin-top: 8px;
-  font-size: 14px;
-  color: var(--el-text-color-secondary);
 }
 </style> 

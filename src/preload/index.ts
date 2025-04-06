@@ -1,5 +1,6 @@
-import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
-import type { Settings, AIRequestParams, StoredSettings } from '../types'
+import { contextBridge, ipcRenderer } from 'electron'
+import type { AIRequestParams, StoredSettings, UpdateInfo } from '../types'
+import { electronAPI } from '@electron-toolkit/preload'
 
 // 扩展 Window 接口
 declare global {
@@ -20,7 +21,7 @@ declare global {
       onAutoGenerate: (callback: () => void) => () => void
       closePopup: () => void
       moveWindow: (deltaX: number, deltaY: number) => void
-      checkForUpdates: () => Promise<{ hasUpdate: boolean, version?: string }>
+      checkForUpdates: () => Promise<UpdateInfo>
     }
   }
 }
@@ -44,7 +45,7 @@ const api = {
 
   // 监听文本选择事件
   onTextSelected: (callback: (text: string) => void) => {
-    const handler = (event: IpcRendererEvent, text: string) => callback(text)
+    const handler = (_: unknown, text: string) => callback(text)
     ipcRenderer.on('selected-text', handler)
     return () => {
       ipcRenderer.removeListener('selected-text', handler)
@@ -71,10 +72,24 @@ const api = {
   },
 
   // 检查更新
-  checkForUpdates: () => {
+  checkForUpdates: (): Promise<UpdateInfo> => {
     return ipcRenderer.invoke('check-for-updates')
   }
 }
 
-// 暴露给渲染进程
-contextBridge.exposeInMainWorld('electronAPI', api)
+// Use `contextBridge` APIs to expose Electron APIs to
+// renderer only if context isolation is enabled, otherwise
+// just add to the DOM global.
+if (process.contextIsolated) {
+  try {
+    contextBridge.exposeInMainWorld('electron', electronAPI)
+    contextBridge.exposeInMainWorld('electronAPI', api)
+  } catch (error) {
+    console.error(error)
+  }
+} else {
+  // @ts-ignore (define in dts)
+  window.electron = electronAPI
+  // @ts-ignore (define in dts)
+  window.electronAPI = api
+}
