@@ -1,19 +1,39 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
 node_modules
 dist
-out
-.DS_Store
-*.log*
+dist-ssr
+dist-electron
+release
+*.local
 
-# 环境变量文件
-.env
-.env.local
-.env.*.local
-
-# 编辑器配置
-.vscode
+# Editor directories and files
+.vscode/.debug.env
 .idea
+.DS_Store
 *.suo
 *.ntvs*
 *.njsproj
 *.sln
 *.sw?
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# lockfile
+package-lock.json
+pnpm-lock.yaml
+yarn.lock
+
+# build output
+/out/
+/build/
