@@ -1,48 +1,62 @@
-import { contextBridge, ipcRenderer } from 'electron'
-import { electronAPI } from '@electron-toolkit/preload'
-import type { Settings, StoredSettings, AIRequestParams, WindowCommand } from '../types'
+import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron'
+import type { Settings, AIRequestParams, StoredSettings } from '../types'
 
 // 扩展 Window 接口
 declare global {
   interface Window {
     electron: {
-      ipcRenderer: {
-        send(channel: 'window-control', command: WindowCommand): void
+      process: {
+        versions: {
+          app: string
+        }
       }
+      ipcRenderer: typeof ipcRenderer
     }
     electronAPI: {
+      getAIResponse: (params: AIRequestParams) => Promise<string[]>
       getSettings: () => Promise<StoredSettings>
       saveSettings: (settings: StoredSettings) => Promise<boolean>
       onTextSelected: (callback: (text: string) => void) => () => void
-      removeTextSelectedListener: (callback: (text: string) => void) => void
-      getAIResponse: (params: AIRequestParams) => Promise<string>
+      onAutoGenerate: (callback: () => void) => () => void
+      closePopup: () => void
+      moveWindow: (deltaX: number, deltaY: number) => void
+      checkForUpdates: () => Promise<{ hasUpdate: boolean, version?: string }>
     }
   }
 }
 
-// 自定义 API
+// 导出 electronAPI 给渲染进程使用
 const api = {
-  // 获取 AI 回复
-  getAIResponse: (params: { text: string; persona: string }): Promise<string[]> => {
+  // 获取AI回复
+  getAIResponse: (params: AIRequestParams) => {
     return ipcRenderer.invoke('get-ai-response', params)
   },
 
   // 获取设置
-  getSettings: (): Promise<{ settings: Settings }> => {
+  getSettings: () => {
     return ipcRenderer.invoke('get-settings')
   },
 
   // 保存设置
-  saveSettings: (settings: { settings: Settings }): Promise<boolean> => {
+  saveSettings: (settings: StoredSettings) => {
     return ipcRenderer.invoke('save-settings', settings)
   },
 
-  // 监听选中文本事件
+  // 监听文本选择事件
   onTextSelected: (callback: (text: string) => void) => {
-    const handler = (_: any, text: string) => callback(text)
-    ipcRenderer.on('text-selected', handler)
+    const handler = (event: IpcRendererEvent, text: string) => callback(text)
+    ipcRenderer.on('selected-text', handler)
     return () => {
-      ipcRenderer.removeListener('text-selected', handler)
+      ipcRenderer.removeListener('selected-text', handler)
+    }
+  },
+
+  // 监听自动生成事件
+  onAutoGenerate: (callback: () => void) => {
+    const handler = () => callback()
+    ipcRenderer.on('auto-generate', handler)
+    return () => {
+      ipcRenderer.removeListener('auto-generate', handler)
     }
   },
 
@@ -54,11 +68,13 @@ const api = {
   // 移动窗口
   moveWindow: (deltaX: number, deltaY: number) => {
     ipcRenderer.send('move-window', { deltaX, deltaY })
+  },
+
+  // 检查更新
+  checkForUpdates: () => {
+    return ipcRenderer.invoke('check-for-updates')
   }
 }
 
-// 使用上下文桥接暴露 API
+// 暴露给渲染进程
 contextBridge.exposeInMainWorld('electronAPI', api)
-
-// 导出 API 类型
-export type ElectronAPI = typeof api

@@ -1,14 +1,72 @@
 <template>
   <div class="popup-container">
     <div class="popup-header" @mousedown="startDrag">
-      <h2>高情商回复助手</h2>
-      <button class="close-btn" @click="closePopup">×</button>
+      <div class="header-actions">
+        <button class="session-btn" @click="showSessions = !showSessions">
+          {{ getCurrentSessionName() }}
+        </button>
+        <button class="close-btn" @click="closePopup">×</button>
+      </div>
     </div>
 
     <div class="content">
-      <div class="selected-text">
-        <h3>选中的文本:</h3>
-        <p>{{ selectedText }}</p>
+      <!-- 会话列表 -->
+      <div v-if="showSessions" class="sessions">
+        <div class="session-list">
+          <div 
+            class="session-item"
+            :class="{ active: currentSessionId === 'default' }"
+            @click="selectSession('default')"
+          >
+            <div class="session-title">默认会话</div>
+          </div>
+          <div 
+            v-for="session in customSessions" 
+            :key="session.id"
+            :class="['session-item', { active: session.id === currentSessionId }]"
+            @click="selectSession(session.id)"
+          >
+            <div class="session-title">{{ session.title }}</div>
+            <div class="session-time">{{ formatTime(session.lastUpdated) }}</div>
+            <div class="session-context" v-if="session.messages?.length">
+              <div class="context-item" v-for="(msg, idx) in session.messages.slice(-2)" :key="idx">
+                <div class="context-role">{{ msg.role === 'user' ? '我' : 'AI' }}:</div>
+                <div class="context-content">{{ msg.content }}</div>
+              </div>
+            </div>
+            <button 
+              class="delete-btn" 
+              @click.stop="deleteSession(session.id)"
+              v-if="session.id !== 'default'"
+            >
+              ×
+            </button>
+          </div>
+          <div class="session-item new" @click="createNewSession" v-if="sessions.length < 10">
+            <input 
+              v-if="isCreatingSession"
+              ref="sessionNameInput"
+              v-model="newSessionName"
+              @keydown.enter="confirmNewSession"
+              @blur="cancelNewSession"
+              @keydown.esc="cancelNewSession"
+              placeholder="输入会话名称后回车"
+              class="session-name-input"
+            />
+            <template v-else>
+              + 新建会话
+            </template>
+          </div>
+        </div>
+      </div>
+
+      <div class="input-area">
+        <textarea 
+          v-model="selectedText"
+          placeholder="请输入或粘贴需要回复的内容..."
+          @keydown.enter.ctrl="getReply"
+          rows="4"
+        ></textarea>
       </div>
 
       <div class="reply-options">
@@ -20,6 +78,16 @@
             @click="selectPersona(option)"
           >
             {{ option }}
+          </button>
+        </div>
+        <div class="input-actions">
+          <span class="tip">提示: Ctrl + Enter 快速生成回复</span>
+          <button 
+            class="generate-btn" 
+            @click="getReply"
+            :disabled="!selectedText.trim()"
+          >
+            生成回复
           </button>
         </div>
       </div>
@@ -48,7 +116,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
+import type { Conversation } from '../../../types'
 
 const selectedText = ref('')
 const selectedPersona = ref('职场精英')
@@ -56,14 +125,126 @@ const loading = ref(false)
 const error = ref('')
 const replies = ref<string[]>([])
 const copiedIndex = ref(-1)
+const showSessions = ref(false)
+const sessions = ref<Conversation[]>([])
+const currentSessionId = ref('default')
+const isCreatingSession = ref(false)
+const newSessionName = ref('')
+const sessionNameInput = ref<HTMLInputElement | null>(null)
 
 const replyOptions = ['职场精英', '暖心朋友', '情感专家']
 
+// 计算属性：自定义会话列表（排除默认会话）
+const customSessions = computed(() => {
+  return sessions.value.filter(session => session.id !== 'default')
+})
+
+// 获取当前会话名称
+function getCurrentSessionName() {
+  if (currentSessionId.value === 'default') {
+    return '默认会话'
+  }
+  const session = sessions.value.find(s => s.id === currentSessionId.value)
+  return session ? session.title : '新会话'
+}
+
+// 加载设置和会话
+async function loadSettings() {
+  try {
+    const settings = await window.electronAPI.getSettings()
+    if (settings) {
+      sessions.value = settings.conversations || []
+      // 确保默认会话存在
+      if (!sessions.value.find(s => s.id === 'default')) {
+        sessions.value.push({
+          id: 'default',
+          title: '默认会话',
+          messages: [],
+          lastUpdated: Date.now()
+        })
+      }
+    }
+  } catch (err) {
+    console.error('加载设置失败:', err)
+  }
+}
+
+// 创建新会话
+function createNewSession() {
+  isCreatingSession.value = true
+  newSessionName.value = ''
+  nextTick(() => {
+    sessionNameInput.value?.focus()
+  })
+}
+
+// 确认创建新会话
+function confirmNewSession() {
+  if (newSessionName.value.trim() && sessions.value.length < 10) {
+    const sessionId = Date.now().toString(36)
+    const newSession = {
+      id: sessionId,
+      title: newSessionName.value.trim(),
+      messages: [],
+      lastUpdated: Date.now()
+    }
+    sessions.value.push(newSession)
+    currentSessionId.value = sessionId
+    showSessions.value = false
+    isCreatingSession.value = false
+    
+    // 保存设置
+    window.electronAPI.getSettings()
+      .then(settings => {
+        return window.electronAPI.saveSettings({
+          ...settings,
+          conversations: sessions.value
+        })
+      })
+      .catch(err => {
+        console.error('保存设置失败:', err)
+        error.value = '创建会话失败'
+      })
+  }
+}
+
+// 取消创建新会话
+function cancelNewSession() {
+  isCreatingSession.value = false
+  newSessionName.value = ''
+}
+
+// 选择会话
+function selectSession(sessionId: string) {
+  currentSessionId.value = sessionId
+  showSessions.value = false
+}
+
+// 格式化时间
+function formatTime(timestamp: number) {
+  const date = new Date(timestamp)
+  return date.toLocaleString()
+}
+
 // 监听选中文本事件
-onMounted(() => {
-  window.electronAPI.onTextSelected((text: string) => {
-    selectedText.value = text
-    getReply()
+onMounted(async () => {
+  await loadSettings()
+  const cleanup = window.electronAPI.onTextSelected((text: string) => {
+    console.log('收到选中的文本:', text)
+    selectedText.value = text || ''  // 如果没有选中文本，设置为空字符串
+  })
+
+  // 监听自动生成事件
+  const cleanupAutoGenerate = window.electronAPI.onAutoGenerate(() => {
+    if (selectedText.value.trim()) {
+      getReply()
+    }
+  })
+
+  // 组件卸载时清理事件监听
+  onUnmounted(() => {
+    cleanup()
+    cleanupAutoGenerate()
   })
 })
 
@@ -75,7 +256,7 @@ async function selectPersona(persona: string) {
 
 // 获取回复
 async function getReply() {
-  if (!selectedText.value) return
+  if (!selectedText.value.trim()) return
   
   loading.value = true
   error.value = ''
@@ -83,10 +264,12 @@ async function getReply() {
   copiedIndex.value = -1
   
   try {
-    replies.value = await window.electronAPI.getAIResponse({
+    const response = await window.electronAPI.getAIResponse({
       text: selectedText.value,
-      persona: selectedPersona.value
+      persona: selectedPersona.value,
+      conversationId: currentSessionId.value
     })
+    replies.value = Array.isArray(response) ? response : [response]
   } catch (err) {
     error.value = err instanceof Error ? err.message : '生成回复失败'
   } finally {
@@ -101,7 +284,7 @@ async function selectReply(reply: string, index: number) {
     copiedIndex.value = index
     setTimeout(() => {
       closePopup()
-    }, 500) // 显示复制成功提示后关闭窗口
+    }, 500)
   } catch (err) {
     console.error('复制失败:', err)
     error.value = '复制失败，请手动复制'
@@ -123,7 +306,6 @@ function startDrag(e: MouseEvent) {
   startX = e.clientX
   startY = e.clientY
   
-  // 添加事件监听
   document.addEventListener('mousemove', onDrag)
   document.addEventListener('mouseup', stopDrag)
 }
@@ -134,7 +316,6 @@ function onDrag(e: MouseEvent) {
   const deltaX = e.clientX - startX
   const deltaY = e.clientY - startY
   
-  // 发送消息给主进程移动窗口
   window.electronAPI.moveWindow(deltaX, deltaY)
   
   startX = e.clientX
@@ -147,11 +328,36 @@ function stopDrag() {
   document.removeEventListener('mouseup', stopDrag)
 }
 
-// 组件卸载时清理事件监听
 onUnmounted(() => {
   document.removeEventListener('mousemove', onDrag)
   document.removeEventListener('mouseup', stopDrag)
 })
+
+// 删除会话
+function deleteSession(sessionId: string) {
+  if (sessionId === 'default') return
+  
+  // 如果删除的是当前会话，切换到默认会话
+  if (sessionId === currentSessionId.value) {
+    currentSessionId.value = 'default'
+  }
+  
+  // 从会话列表中移除
+  sessions.value = sessions.value.filter(s => s.id !== sessionId)
+  
+  // 保存设置
+  window.electronAPI.getSettings()
+    .then(settings => {
+      return window.electronAPI.saveSettings({
+        ...settings,
+        conversations: sessions.value
+      })
+    })
+    .catch(err => {
+      console.error('保存设置失败:', err)
+      error.value = '删除会话失败'
+    })
+}
 </script>
 
 <style>
@@ -169,16 +375,33 @@ onUnmounted(() => {
 
 .popup-header {
   display: flex;
-  justify-content: space-between;
+  justify-content: flex-end;
   align-items: center;
   margin-bottom: 16px;
-  cursor: move; /* 指示可拖动 */
-  user-select: none; /* 防止文本选择 */
-  -webkit-app-region: drag; /* 支持窗口拖动 */
+  cursor: move;
+  user-select: none;
+  -webkit-app-region: drag;
+  padding: 4px;
 }
 
-.popup-header button {
-  -webkit-app-region: no-drag; /* 按钮不参与拖动 */
+.header-actions {
+  display: flex;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.session-btn {
+  background: none;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 4px 8px;
+  font-size: 12px;
+  cursor: pointer;
+  color: #666;
+}
+
+.session-btn:hover {
+  background: #f5f5f5;
 }
 
 .popup-header h2 {
@@ -197,27 +420,126 @@ onUnmounted(() => {
 
 .content {
   flex: 1;
-  overflow-y: auto;
+  overflow: hidden;
+  position: relative;
 }
 
-.selected-text {
-  background: #f5f5f5;
+.sessions {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  background: white;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
+  z-index: 10;
+  max-height: 300px;
+  overflow-y: auto;
+  scrollbar-width: none; /* Firefox */
+  -ms-overflow-style: none; /* IE and Edge */
+}
+
+.sessions::-webkit-scrollbar {
+  display: none; /* Chrome, Safari, Opera */
+}
+
+.session-list {
+  padding: 8px;
+}
+
+.session-item {
   padding: 12px;
   border-radius: 6px;
-  margin-bottom: 16px;
+  cursor: pointer;
+  transition: all 0.2s;
+  margin-bottom: 8px;
+  background: #f5f5f5;
+  position: relative;
 }
 
-.selected-text h3 {
-  margin: 0 0 8px 0;
-  font-size: 14px;
+.session-item:hover {
+  background: #e6f7ff;
+}
+
+.session-item.active {
+  background: #1890ff;
+  color: white;
+}
+
+.session-item.new {
+  background: #f0f0f0;
+  text-align: center;
   color: #666;
 }
 
-.selected-text p {
-  margin: 0;
+.session-name-input {
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid #ddd;
+  border-radius: 4px;
   font-size: 14px;
-  color: #333;
-  word-break: break-all;
+  outline: none;
+}
+
+.session-name-input:focus {
+  border-color: #1890ff;
+}
+
+.session-title {
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+
+.session-time {
+  font-size: 12px;
+  color: #999;
+}
+
+.session-context {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #666;
+  border-top: 1px solid #eee;
+  padding-top: 8px;
+}
+
+.context-item {
+  display: flex;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.context-role {
+  flex-shrink: 0;
+  color: #1890ff;
+}
+
+.context-content {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.input-area {
+  margin-bottom: 16px;
+}
+
+textarea {
+  width: 100%;
+  padding: 12px;
+  border: 1px solid #ddd;
+  border-radius: 6px;
+  resize: none;
+  font-size: 14px;
+  line-height: 1.5;
+  margin-bottom: 8px;
+  background: #f9f9f9;
+}
+
+textarea:focus {
+  outline: none;
+  border-color: #1890ff;
+  background: white;
 }
 
 .reply-options {
@@ -227,6 +549,7 @@ onUnmounted(() => {
 .buttons {
   display: flex;
   gap: 8px;
+  margin-bottom: 12px;
 }
 
 .buttons button {
@@ -244,6 +567,36 @@ onUnmounted(() => {
   border-color: #1890ff;
 }
 
+.input-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tip {
+  font-size: 12px;
+  color: #999;
+}
+
+.generate-btn {
+  padding: 6px 16px;
+  border: none;
+  border-radius: 4px;
+  background: #1890ff;
+  color: white;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.generate-btn:hover {
+  background: #40a9ff;
+}
+
+.generate-btn:disabled {
+  background: #d9d9d9;
+  cursor: not-allowed;
+}
+
 .loading {
   text-align: center;
   color: #666;
@@ -258,9 +611,15 @@ onUnmounted(() => {
 }
 
 .replies {
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
+  max-height: calc(100% - 200px);
+  overflow-y: auto;
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+  padding-right: 4px;
+}
+
+.replies::-webkit-scrollbar {
+  display: none;
 }
 
 .reply-item {
@@ -270,10 +629,12 @@ onUnmounted(() => {
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.2s;
+  border: 1px solid transparent;
 }
 
 .reply-item:hover {
   background: #e6f7ff;
+  border-color: #1890ff;
 }
 
 .reply-text {
@@ -290,5 +651,39 @@ onUnmounted(() => {
   padding: 2px 8px;
   border-radius: 4px;
   font-size: 12px;
+}
+
+.delete-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: none;
+  border: none;
+  color: #999;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px 8px;
+  border-radius: 4px;
+  opacity: 0;
+  transition: all 0.2s;
+}
+
+.session-item:hover .delete-btn {
+  opacity: 1;
+}
+
+.delete-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #ff4d4f;
+}
+
+.session-item.active .delete-btn {
+  color: white;
+}
+
+.session-item.active .delete-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  color: white;
 }
 </style> 

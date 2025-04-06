@@ -23,6 +23,17 @@
     <div class="settings-header">
       <h2>设置</h2>
       <p class="settings-desc">配置你的AI助手</p>
+      <div class="version-info">
+        <span>当前版本: v{{ currentVersion }}</span>
+        <el-button 
+          type="primary" 
+          link 
+          :loading="checkingUpdate"
+          @click="checkUpdate"
+        >
+          检查更新
+        </el-button>
+      </div>
     </div>
     
     <el-form :model="settings" label-width="120px" class="settings-form">
@@ -94,7 +105,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Minus, Close } from '@element-plus/icons-vue'
-import type { Settings, StoredSettings } from '@/types'
+import type { Settings } from '@/types'
 
 // 预设的人设模板
 const defaultPrompts: Record<string, string> = {
@@ -247,17 +258,12 @@ const saveSettings = async () => {
     }
 
     // 创建要保存的设置对象
-    const settingsToSave: StoredSettings = {
+    const settingsToSave = {
       settings: {
         apiKey: settings.value.apiKey,
         prompts: settings.value.prompts || {},
         shortcut: settings.value.shortcut
       }
-    }
-    
-    // 确保 prompts 是一个普通对象
-    if (settingsToSave.settings.prompts instanceof Object) {
-      settingsToSave.settings.prompts = { ...settingsToSave.settings.prompts }
     }
     
     console.log('准备保存的设置:', JSON.stringify(settingsToSave))
@@ -295,8 +301,42 @@ const closeWindow = () => {
   window.electron.ipcRenderer.send('window-control', 'hide')
 }
 
+// 版本和更新相关
+const currentVersion = ref('1.0.0') // 当前版本号
+const checkingUpdate = ref(false)
+
+// 检查更新
+async function checkUpdate() {
+  if (checkingUpdate.value) return
+  
+  checkingUpdate.value = true
+  try {
+    const result = await window.electronAPI.checkForUpdates()
+    if (result.hasUpdate) {
+      ElMessage({
+        message: `发现新版本 v${result.version}，请前往 GitHub 下载更新`,
+        type: 'success',
+        duration: 5000,
+        showClose: true
+      })
+    } else {
+      ElMessage({
+        message: '当前已是最新版本',
+        type: 'success',
+        duration: 3000
+      })
+    }
+  } catch (error) {
+    ElMessage.error('检查更新失败，请稍后重试')
+  } finally {
+    checkingUpdate.value = false
+  }
+}
+
 onMounted(() => {
   loadSettings()
+  // 获取当前版本号
+  currentVersion.value = window.electron.process.versions.app
 })
 </script>
 
@@ -456,5 +496,15 @@ onMounted(() => {
 .settings-footer {
   margin-top: 30px;
   text-align: center;
+}
+
+.version-info {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 8px;
+  font-size: 14px;
+  color: var(--el-text-color-secondary);
 }
 </style> 
