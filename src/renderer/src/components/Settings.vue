@@ -42,8 +42,9 @@
           </el-button>
         </div>
         <el-menu
-          default-active="general"
+          v-model:default-active="activeMenu"
           class="settings-menu"
+          @select="handleMenuSelect"
         >
           <el-menu-item index="general">
             <el-icon><Setting /></el-icon>
@@ -68,7 +69,7 @@
       <div class="content">
         <el-form :model="settings" label-position="top" class="settings-form">
           <!-- 基础设置 -->
-          <div class="settings-section">
+          <div v-show="activeMenu === 'general'" class="settings-section">
             <h2 class="section-title">基础设置</h2>
             
             <el-form-item label="DeepSeek API Key">
@@ -121,36 +122,100 @@
           </div>
 
           <!-- 预设人设 -->
-          <div class="settings-section">
+          <div v-show="activeMenu === 'prompts'" class="settings-section">
             <div class="section-header">
               <h2 class="section-title">预设人设</h2>
-              <el-button type="primary" link @click="resetPrompts">
-                <el-icon><Refresh /></el-icon>
-                恢复默认
-              </el-button>
+              <div class="section-actions">
+                <el-button type="primary" @click="addNewPrompt">
+                  <el-icon><Plus /></el-icon>
+                  新增人设
+                </el-button>
+                <el-button type="primary" link @click="resetPrompts">
+                  <el-icon><Refresh /></el-icon>
+                  恢复默认
+                </el-button>
+              </div>
             </div>
             
             <div class="prompts-grid">
               <el-card
-                v-for="[role] in Object.entries(settings.prompts || defaultPrompts)"
-                :key="role"
+                v-for="[key, prompt] in Object.entries(settings.prompts)"
+                :key="key"
                 class="prompt-card"
                 shadow="hover"
               >
                 <template #header>
                   <div class="prompt-header">
-                    <span class="role-name">{{ role }}</span>
+                    <el-input
+                      v-model="prompt.title"
+                      class="prompt-title-input"
+                      :disabled="prompt.isDefault"
+                      placeholder="输入人设名称"
+                    />
+                    <el-button
+                      v-if="!prompt.isDefault"
+                      type="danger"
+                      link
+                      @click="deletePrompt(key)"
+                    >
+                      <el-icon><Delete /></el-icon>
+                    </el-button>
                   </div>
                 </template>
                 <el-input
-                  v-model="settings.prompts![role]"
-                  :placeholder="defaultPrompts[role]"
+                  v-model="prompt.content"
+                  :disabled="prompt.isDefault"
                   type="textarea"
                   :rows="4"
                   class="prompt-input"
+                  placeholder="输入人设描述"
                 />
               </el-card>
             </div>
+          </div>
+
+          <!-- 高级设置 -->
+          <div v-show="activeMenu === 'advanced'" class="settings-section">
+            <h2 class="section-title">高级设置</h2>
+            <el-form-item label="自动生成">
+              <el-switch
+                v-model="settings.autoGenerate"
+                active-text="开启"
+                inactive-text="关闭"
+              />
+              <div class="setting-tip">
+                开启后，选中文本时会自动生成回复
+              </div>
+            </el-form-item>
+
+            <el-form-item label="自动生成快捷键">
+              <el-input 
+                v-model="settings.autoGenerateShortcut" 
+                placeholder="自动生成快捷键" 
+                readonly
+              />
+            </el-form-item>
+
+            <el-form-item label="系统提示词">
+              <el-input
+                v-model="settings.systemPrompt"
+                type="textarea"
+                :rows="4"
+                placeholder="输入系统提示词，用于控制AI的整体行为"
+              />
+            </el-form-item>
+          </div>
+
+          <!-- 关于 -->
+          <div v-show="activeMenu === 'about'" class="settings-section">
+            <h2 class="section-title">关于</h2>
+            <p>WeChat Assistant 是一个基于 AI 的微信消息助手，帮助你更高效地处理微信消息。</p>
+            <p>当前版本：v{{ currentVersion }}</p>
+            <p>
+              <el-button type="primary" link @click="checkUpdate">
+                检查更新
+              </el-button>
+            </p>
           </div>
 
           <!-- 保存按钮 -->
@@ -179,9 +244,11 @@ import {
   Refresh,
   Minus,
   FullScreen,
-  Close
+  Close,
+  Plus,
+  Delete
 } from '@element-plus/icons-vue'
-import type { StoredSettings, ElectronAPI } from '../../../types'
+import type { StoredSettings, Prompt, ElectronAPI } from '../../../types'
 import type { IpcRenderer } from 'electron'
 
 declare global {
@@ -199,18 +266,37 @@ declare global {
 }
 
 // 预设的人设模板
-const defaultPrompts: Record<string, string> = {
-  '职场精英': '你现在是一位经验丰富的职场精英，擅长处理各种职场关系。请用专业、得体但不失温度的语言回复以下内容。注意措辞要准确、积极向上、富有建设性，同时也要体现出对他人的尊重和理解。',
-  
-  '情感专家': '你现在是一位富有同理心的情感咨询师，擅长处理各种人际关系。请用温和、理解、富有同理心的方式回复以下内容。注意语言要温暖、富有支持性，同时也要给出建设性的建议。',
-  
-  '外交官': '你现在是一位资深外交官，擅长处理敏感话题和冲突情况。请用圆润、委婉但不失立场的方式回复以下内容。注意措辞要得体、富有技巧，既要表达诉求，也要照顾各方感受。',
-  
-  '智者': '你现在是一位睿智的长者，擅长给出富有哲理的建议。请用平和、富有智慧的方式回复以下内容。注意语言要有深度、富有启发性，同时也要易于理解和接受。',
-  
-  '知心朋友': '你现在是一位知心好友，擅长倾听和开导。请用轻松、亲切的语气回复以下内容。注意语言要自然、真诚，像朋友间的对话一样温暖和真实。',
-  
-  '幽默达人': '你现在是一位幽默风趣的达人，擅长用轻松愉快的方式化解尴尬。请用诙谐、机智但不失分寸的方式回复以下内容。注意把握幽默的度，既要有趣，也要得体。'
+const defaultPrompts: Record<string, Prompt> = {
+  '职场精英': {
+    title: '职场精英',
+    content: '你现在是一位经验丰富的职场精英，擅长处理各种职场关系。请用专业、得体但不失温度的语言回复以下内容。注意措辞要准确、积极向上、富有建设性，同时也要体现出对他人的尊重和理解。',
+    isDefault: true
+  },
+  '情感专家': {
+    title: '情感专家',
+    content: '你现在是一位富有同理心的情感咨询师，擅长处理各种人际关系。请用温和、理解、富有同理心的方式回复以下内容。注意语言要温暖、富有支持性，同时也要给出建设性的建议。',
+    isDefault: true
+  },
+  '外交官': {
+    title: '外交官',
+    content: '你现在是一位资深外交官，擅长处理敏感话题和冲突情况。请用圆润、委婉但不失立场的方式回复以下内容。注意措辞要得体、富有技巧，既要表达诉求，也要照顾各方感受。',
+    isDefault: true
+  },
+  '智者': {
+    title: '智者',
+    content: '你现在是一位睿智的长者，擅长给出富有哲理的建议。请用平和、富有智慧的方式回复以下内容。注意语言要有深度、富有启发性，同时也要易于理解和接受。',
+    isDefault: true
+  },
+  '暖心朋友': {
+    title: '暖心朋友',
+    content: '你现在是一位知心好友，擅长倾听和开导。请用轻松、亲切的语气回复以下内容。注意语言要自然、真诚，像朋友间的对话一样温暖和真实。',
+    isDefault: true
+  },
+  '幽默达人': {
+    title: '幽默达人',
+    content: '你现在是一位幽默风趣的达人，擅长用轻松愉快的方式化解尴尬。请用诙谐、机智但不失分寸的方式回复以下内容。注意把握幽默的度，既要有趣，也要得体。',
+    isDefault: true
+  }
 }
 
 // 修改默认快捷键
@@ -309,6 +395,10 @@ const checkingUpdate = ref(false)
 async function checkUpdate() {
   try {
     checkingUpdate.value = true
+    if (!window.electronAPI.checkForUpdates) {
+      throw new Error('更新检查功能未实现')
+    }
+    
     const updateInfo = await window.electronAPI.checkForUpdates()
     
     if (updateInfo.hasUpdate) {
@@ -327,7 +417,7 @@ async function checkUpdate() {
     }
   } catch (error) {
     console.error('检查更新失败:', error)
-    ElMessage.error('检查更新失败')
+    ElMessage.error(error instanceof Error ? error.message : '检查更新失败')
   } finally {
     checkingUpdate.value = false
   }
@@ -397,17 +487,16 @@ const saveSettings = async () => {
     // 创建一个只包含需要保存的数据的对象
     const settingsToSave = {
       apiKey: settings.value.apiKey,
-      prompts: { ...settings.value.prompts },
+      prompts: Object.entries(settings.value.prompts).reduce((acc, [key, prompt]) => {
+        acc[key] = {
+          title: prompt.title,
+          content: prompt.content,
+          isDefault: prompt.isDefault
+        }
+        return acc
+      }, {} as Record<string, Prompt>),
       shortcut: settings.value.shortcut,
-      conversations: settings.value.conversations.map(conv => ({
-        id: conv.id,
-        title: conv.title,
-        messages: conv.messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
-        })),
-        lastUpdated: conv.lastUpdated
-      })),
+      conversations: [],
       autoGenerate: settings.value.autoGenerate,
       autoGenerateShortcut: settings.value.autoGenerateShortcut,
       systemPrompt: settings.value.systemPrompt,
@@ -429,8 +518,34 @@ const saveSettings = async () => {
 
 // 重置提示词
 const resetPrompts = () => {
+  const defaultPrompts: Record<string, Prompt> = {
+    '智能助手': {
+      title: '智能助手',
+      content: '你现在是一位专业、友善的智能助手，擅长处理各种类型的对话。请用得体、专业但不失温度的语言回复以下内容。注意措辞要准确、积极向上、富有建设性，同时也要体现出对他人的尊重和理解。',
+      isDefault: true
+    }
+  }
   settings.value.prompts = { ...defaultPrompts }
   ElMessage.success('已恢复默认提示词')
+}
+
+// 添加新人设
+const addNewPrompt = () => {
+  const id = Date.now().toString()
+  settings.value.prompts[id] = {
+    title: '新人设',
+    content: '',
+    isDefault: false
+  }
+}
+
+// 删除人设
+const deletePrompt = (key: string) => {
+  const prompt = settings.value.prompts[key]
+  if (prompt && !prompt.isDefault) {
+    delete settings.value.prompts[key]
+    ElMessage.success('删除成功')
+  }
 }
 
 // 窗口控制函数
@@ -459,6 +574,14 @@ const handleAutoLaunchChange = async (value: boolean) => {
     settings.value.autoLaunch = !value // 恢复之前的状态
     ElMessage.error('设置自启动时出错')
   }
+}
+
+// 当前激活的菜单项
+const activeMenu = ref('general')
+
+// 处理菜单选择
+const handleMenuSelect = (index: string) => {
+  activeMenu.value = index
 }
 
 // 组件挂载时加载设置
@@ -589,6 +712,11 @@ onMounted(async () => {
   font-weight: 600;
 }
 
+.section-actions {
+  display: flex;
+  gap: 12px;
+}
+
 .api-key-input {
   max-width: 500px;
 }
@@ -624,16 +752,22 @@ onMounted(async () => {
   background: var(--el-bg-color);
 }
 
+.prompt-card :deep(.el-card__header) {
+  padding: 12px;
+}
+
+.prompt-card :deep(.el-card__body) {
+  padding: 12px;
+}
+
 .prompt-header {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  gap: 12px;
 }
 
-.role-name {
-  font-size: 16px;
-  font-weight: 500;
-  color: var(--el-text-color-primary);
+.prompt-title-input {
+  flex: 1;
 }
 
 .settings-footer {

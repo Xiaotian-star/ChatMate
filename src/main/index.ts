@@ -5,7 +5,7 @@ import icon from '../../resources/icon.png?asset'
 import type { Message, Conversation, AIRequestParams, StoredSettings } from '../types'
 import { getAIResponse } from './ai'
 import { getSettings, saveSettings } from './settings'
-import { update } from './update'
+import { update, checkForUpdates } from './update'
 
 let mainWindow: BrowserWindow | null = null
 let popupWindow: BrowserWindow | null = null
@@ -460,7 +460,12 @@ ipcMain.on('close-popup', () => {
 
 // 检查更新
 ipcMain.handle('check-for-updates', async () => {
-  return update()
+  try {
+    return await checkForUpdates()
+  } catch (error) {
+    console.error('检查更新失败:', error)
+    throw error
+  }
 })
 
 // 调整窗口大小

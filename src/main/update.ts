@@ -19,7 +19,64 @@ if (process.env.GITHUB_TOKEN) {
   GITHUB_API_CONFIG.headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`
 }
 
+// 版本比较函数
+function compareVersions(v1: string, v2: string): number {
+  // 移除版本号前的'v'前缀
+  const version1 = v1.replace(/^v/, '')
+  const version2 = v2.replace(/^v/, '')
+  
+  const parts1 = version1.split('.').map(Number)
+  const parts2 = version2.split('.').map(Number)
+  
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const num1 = parts1[i] || 0
+    const num2 = parts2[i] || 0
+    
+    if (num1 > num2) return 1
+    if (num1 < num2) return -1
+  }
+  
+  return 0
+}
+
 // 检查更新
+export async function checkForUpdates(): Promise<{
+  hasUpdate: boolean
+  latestVersion: string
+}> {
+  try {
+    // 获取当前版本号
+    const currentVersion = app.getVersion()
+    console.log('当前版本号:', currentVersion)
+
+    // 从 GitHub 获取发布列表
+    console.log('正在检查更新...')
+    const { data: releases } = await axios.get(
+      'https://api.github.com/repos/Xiaotian-star/ChatMate/releases',
+      GITHUB_API_CONFIG
+    )
+
+    if (!releases || releases.length === 0) {
+      console.log('未找到任何发布版本')
+      return { hasUpdate: false, latestVersion: currentVersion }
+    }
+
+    // 获取最新的发布版本
+    const latestRelease = releases[0]
+    const latestVersion = latestRelease.tag_name?.replace(/^v/, '') || currentVersion
+
+    // 比较版本号
+    const hasUpdate = compareVersions(latestVersion, currentVersion) > 0
+    console.log('版本比较:', { currentVersion, latestVersion, hasUpdate })
+
+    return { hasUpdate, latestVersion }
+  } catch (error) {
+    console.error('检查更新失败:', error)
+    throw error
+  }
+}
+
+// 完整的更新检查流程
 export async function update(): Promise<UpdateInfo> {
   try {
     // 检查 GitHub Token 是否存在
@@ -48,9 +105,8 @@ export async function update(): Promise<UpdateInfo> {
     console.log('最新发布信息:', latestRelease)
 
     // 检查是否有更新
-    const latestVersion = latestRelease.tag_name || currentVersion
-    // 如果 tag_name 不是 '发布' 且与当前版本不同，则认为有更新
-    const hasUpdate = latestRelease.tag_name !== '发布' && latestRelease.tag_name !== currentVersion
+    const latestVersion = latestRelease.tag_name?.replace(/^v/, '') || currentVersion
+    const hasUpdate = compareVersions(latestVersion, currentVersion) > 0
 
     const updateInfo: UpdateInfo = {
       hasUpdate,

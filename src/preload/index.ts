@@ -50,13 +50,20 @@ const api = {
   // 开发者工具
   toggleDevTools: () => ipcRenderer.invoke('toggle-devtools'),
   
+  // 更新相关
+  checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
+  
   // 其他功能
   onTextSelected: (callback: (text: string) => void) => {
     ipcRenderer.on('text-selected', (_, text) => callback(text))
+    return () => ipcRenderer.removeListener('text-selected', callback)
   },
-  onAutoGenerate: (callback: (text: string) => void) => {
-    ipcRenderer.on('auto-generate', (_, text) => callback(text))
-  }
+  onAutoGenerate: (callback: () => void) => {
+    ipcRenderer.on('auto-generate', callback)
+    return () => ipcRenderer.removeListener('auto-generate', callback)
+  },
+  closePopup: () => ipcRenderer.send('close-popup'),
+  moveWindow: (deltaX: number, deltaY: number) => ipcRenderer.send('resize-window', { width: deltaX, height: deltaY })
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

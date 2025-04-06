@@ -72,12 +72,12 @@
       <div class="reply-options">
         <div class="buttons">
           <button 
-            v-for="option in replyOptions" 
-            :key="option"
-            :class="{ active: selectedPersona === option }"
-            @click="selectPersona(option)"
+            v-for="[key, prompt] in Object.entries(settings?.prompts || {})"
+            :key="key"
+            :class="{ active: selectedPersona === prompt.title }"
+            @click="selectPersona(prompt.title)"
           >
-            {{ option }}
+            {{ prompt.title }}
           </button>
         </div>
         <div class="input-actions">
@@ -123,7 +123,7 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
-import type { Conversation, ElectronAPI } from '../../../types'
+import type { Conversation, StoredSettings, ElectronAPI } from '../../../types'
 
 declare global {
   interface Window {
@@ -132,7 +132,7 @@ declare global {
 }
 
 const selectedText = ref('')
-const selectedPersona = ref('职场精英')
+const selectedPersona = ref('智能助手')
 const loading = ref(false)
 const error = ref('')
 const replies = ref<string[]>([])
@@ -144,8 +144,7 @@ const currentSessionId = ref('default')
 const isCreatingSession = ref(false)
 const newSessionName = ref('')
 const sessionNameInput = ref<HTMLInputElement | null>(null)
-
-const replyOptions = ['职场精英', '暖心朋友', '情感专家']
+const settings = ref<StoredSettings | null>(null)
 
 // 计算属性：自定义会话列表（排除默认会话）
 const customSessions = computed(() => {
@@ -161,20 +160,16 @@ function getCurrentSessionName() {
   return session ? session.title : '新会话'
 }
 
-// 加载设置和会话
+// 加载设置
 async function loadSettings() {
   try {
-    const settings = await window.electronAPI.getSettings()
-    if (settings) {
-      sessions.value = settings.conversations || []
-      // 确保默认会话存在
-      if (!sessions.value.find(s => s.id === 'default')) {
-        sessions.value.push({
-          id: 'default',
-          title: '默认会话',
-          messages: [],
-          lastUpdated: Date.now()
-        })
+    const savedSettings = await window.electronAPI.getSettings()
+    if (savedSettings) {
+      settings.value = savedSettings
+      // 如果当前选中的人设不在设置中，选择第一个可用的人设
+      const availablePersonas = Object.values(savedSettings.prompts).map(p => p.title)
+      if (!availablePersonas.includes(selectedPersona.value) && availablePersonas.length > 0) {
+        selectedPersona.value = availablePersonas[0]
       }
     }
   } catch (err) {
@@ -242,32 +237,43 @@ function formatTime(timestamp: number) {
 // 监听选中文本事件
 onMounted(async () => {
   await loadSettings()
+  
+  // 监听选中文本事件
   const cleanup = window.electronAPI.onTextSelected((text: string) => {
     console.log('收到选中的文本:', text)
     selectedText.value = text || ''
   })
 
+  // 监听自动生成事件
   const cleanupAutoGenerate = window.electronAPI.onAutoGenerate(() => {
     if (selectedText.value.trim()) {
       getReply()
     }
   })
 
+  // 定期检查设置更新
+  const settingsInterval = setInterval(async () => {
+    await loadSettings()
+  }, 5000) // 每5秒检查一次设置更新
+
   onUnmounted(() => {
     cleanup()
     cleanupAutoGenerate()
+    clearInterval(settingsInterval)
   })
 })
 
 // 选择回复风格
 async function selectPersona(persona: string) {
   selectedPersona.value = persona
-  await getReply()
+  if (selectedText.value.trim()) {
+    await getReply()
+  }
 }
 
 // 获取回复
 async function getReply() {
-  if (!selectedText.value.trim()) return
+  if (!selectedText.value.trim() || !settings.value) return
   
   loading.value = true
   error.value = ''
@@ -275,13 +281,16 @@ async function getReply() {
   copiedIndex.value = -1
   
   try {
+    const prompt = Object.values(settings.value.prompts).find(p => p.title === selectedPersona.value)
+    if (!prompt) {
+      throw new Error('未找到选中的人设')
+    }
+
     const response = await window.electronAPI.getAIResponse({
       text: selectedText.value,
-      conversationId: currentSessionId.value,
-      persona: selectedPersona.value
+      persona: prompt.content
     })
     
-    // 确保 response 是数组
     if (Array.isArray(response)) {
       replies.value = response
     } else {
