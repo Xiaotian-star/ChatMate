@@ -1,6 +1,6 @@
-# WeChat Assistant (微信助手)
+# ChatMate (对话助手)
 
-一个基于 Electron + Vue3 + TypeScript 开发的智能回复助手，帮助你快速生成合适的回复内容。
+一个基于 Electron + Vue3 + TypeScript 开发的智能对话助手，帮助你在各类社交平台和即时通讯工具中快速生成合适的回复内容。无论是微信、QQ、钉钉、企业微信还是其他社交平台，都能帮你轻松应对各种对话场景。
 
 ## 功能特点
 
@@ -11,6 +11,8 @@
 - 🔄 自动检查更新
 - 💾 本地保存会话历史
 - 🌈 支持自定义提示词
+- 🌐 支持所有主流社交平台
+- 🔒 隐私安全，所有数据本地存储
 
 ## 技术栈
 
@@ -31,10 +33,10 @@
 
 ```bash
 # 克隆项目
-git clone https://github.com/your-username/wechat-assistant.git
+git clone https://github.com/your-username/chatmate.git
 
 # 进入项目目录
-cd wechat-assistant
+cd chatmate
 
 # 安装依赖
 npm install
@@ -128,3 +130,12 @@ wechat-assistant/
 - 多种预设人设
 - 本地保存对话历史
 - 自动检查更新功能
+
+## 使用场景
+
+- 💼 职场沟通：生成专业得体的工作回复
+- 👨‍👩‍👧‍👦 亲友聊天：温暖贴心的日常对话
+- 🤝 商务洽谈：圆润有礼的商务用语
+- 💕 情感交流：富有同理心的情感回应
+- 🎯 社群运营：活跃有趣的互动话题
+- 📝 客户服务：专业规范的服务用语
