@@ -10,9 +10,13 @@ dotenv.config()
 const GITHUB_API_CONFIG = {
   headers: {
     'Accept': 'application/vnd.github.v3+json',
-    'Authorization': process.env.GITHUB_TOKEN ? `Bearer ${process.env.GITHUB_TOKEN}` : '',
     'User-Agent': 'ChatMate-App'
   }
+}
+
+// 如果有 GitHub Token，添加到请求头中
+if (process.env.GITHUB_TOKEN) {
+  GITHUB_API_CONFIG.headers['Authorization'] = `Bearer ${process.env.GITHUB_TOKEN}`
 }
 
 // 检查更新
