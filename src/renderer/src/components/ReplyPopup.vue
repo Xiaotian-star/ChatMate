@@ -388,11 +388,12 @@ function handleKeyDown(e: KeyboardEvent) {
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   padding: 16px;
-  width: 500px;
-  height: 500px;
+  width: 100%;
+  height: 100%;
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  box-sizing: border-box;
 }
 
 .popup-header {
@@ -446,6 +447,7 @@ function handleKeyDown(e: KeyboardEvent) {
   flex-direction: column;
   min-height: 0;
   position: relative;
+  overflow: hidden;
 }
 
 .sessions {
@@ -553,6 +555,7 @@ textarea {
   line-height: 1.5;
   height: 100px;
   background: #f9f9f9;
+  box-sizing: border-box;
 }
 
 textarea:focus {
@@ -660,10 +663,12 @@ textarea:focus {
 .replies {
   flex: 1;
   overflow-y: auto;
+  overflow-x: hidden;
   display: flex;
   flex-direction: column;
   gap: 12px;
   padding-right: 8px;
+  margin-right: -8px;
 }
 
 .reply-item {
@@ -677,6 +682,8 @@ textarea:focus {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
+  box-sizing: border-box;
 }
 
 .reply-item:hover {
@@ -707,6 +714,8 @@ textarea:focus {
   font-size: 14px;
   line-height: 1.6;
   color: #333;
+  word-break: break-all;
+  overflow-wrap: break-word;
 }
 
 .copy-tip {

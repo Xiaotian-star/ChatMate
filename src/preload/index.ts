@@ -22,58 +22,40 @@ declare global {
       closePopup: () => void
       moveWindow: (deltaX: number, deltaY: number) => void
       checkForUpdates: () => Promise<UpdateInfo>
+      windowMin: () => void
+      windowMax: () => void
+      windowClose: () => void
     }
   }
 }
 
 // 导出自定义 API
 const api = {
-  // 获取AI回复
-  getAIResponse: (params: AIRequestParams) => {
-    return ipcRenderer.invoke('get-ai-response', params)
-  },
-
-  // 获取设置
-  getSettings: () => {
-    return ipcRenderer.invoke('get-settings')
-  },
-
-  // 保存设置
-  saveSettings: (settings: StoredSettings) => {
-    return ipcRenderer.invoke('save-settings', settings)
-  },
-
-  // 监听文本选择事件
+  // AI 响应相关
+  getAIResponse: (params: AIRequestParams) => ipcRenderer.invoke('get-ai-response', params),
+  
+  // 设置相关
+  getSettings: () => ipcRenderer.invoke('get-settings'),
+  saveSettings: (settings: StoredSettings) => ipcRenderer.invoke('save-settings', settings),
+  
+  // 自动启动相关
+  getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
+  setAutoLaunch: (enable: boolean) => ipcRenderer.invoke('set-auto-launch', enable),
+  
+  // 窗口控制
+  windowMin: () => ipcRenderer.send('window-min'),
+  windowMax: () => ipcRenderer.send('window-max'),
+  windowClose: () => ipcRenderer.send('window-close'),
+  
+  // 开发者工具
+  toggleDevTools: () => ipcRenderer.invoke('toggle-devtools'),
+  
+  // 其他功能
   onTextSelected: (callback: (text: string) => void) => {
-    const handler = (_: unknown, text: string) => callback(text)
-    ipcRenderer.on('selected-text', handler)
-    return () => {
-      ipcRenderer.removeListener('selected-text', handler)
-    }
+    ipcRenderer.on('text-selected', (_, text) => callback(text))
   },
-
-  // 监听自动生成事件
-  onAutoGenerate: (callback: () => void) => {
-    const handler = () => callback()
-    ipcRenderer.on('auto-generate', handler)
-    return () => {
-      ipcRenderer.removeListener('auto-generate', handler)
-    }
-  },
-
-  // 关闭弹窗
-  closePopup: () => {
-    ipcRenderer.send('close-popup')
-  },
-
-  // 移动窗口
-  moveWindow: (deltaX: number, deltaY: number) => {
-    ipcRenderer.send('move-window', { deltaX, deltaY })
-  },
-
-  // 检查更新
-  checkForUpdates: (): Promise<UpdateInfo> => {
-    return ipcRenderer.invoke('check-for-updates')
+  onAutoGenerate: (callback: (text: string) => void) => {
+    ipcRenderer.on('auto-generate', (_, text) => callback(text))
   }
 }
 

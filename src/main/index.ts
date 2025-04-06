@@ -12,21 +12,47 @@ let popupWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let registeredShortcut: string | null = null
 
+// 判断是否为开发环境
+const isDevelopment = process.env.NODE_ENV === 'development'
+
 // 创建托盘
 function createTray() {
   // 创建托盘图标
   const trayIcon = nativeImage.createFromPath(icon)
-  tray = new Tray(trayIcon)
+  // 调整图标大小为 16x16 (Windows) 或 18x18 (macOS)
+  const iconSize = process.platform === 'darwin' ? 18 : 16
+  const resizedIcon = trayIcon.resize({ width: iconSize, height: iconSize })
+  
+  tray = new Tray(resizedIcon)
 
   // 创建托盘菜单
   const contextMenu = Menu.buildFromTemplate([
     {
-      label: '显示主窗口',
+      label: '打开设置',
       click: () => {
-        if (mainWindow) {
-          mainWindow.show()
+        showMainWindow()
+      }
+    },
+    {
+      type: 'separator'
+    },
+    {
+      label: '快速回复',
+      click: () => {
+        if (!popupWindow) {
+          createPopupWindow()
+        } else {
+          const clipboardText = clipboard.readText()
+          if (clipboardText) {
+            popupWindow.webContents.send('selected-text', clipboardText)
+            popupWindow.webContents.send('auto-generate')
+          }
+          popupWindow.show()
         }
       }
+    },
+    {
+      type: 'separator'
     },
     {
       label: '退出',
@@ -39,15 +65,41 @@ function createTray() {
   // 设置托盘提示文字
   tray.setToolTip('WeChat Assistant')
   
-  // 设置托盘菜单
-  tray.setContextMenu(contextMenu)
+  // macOS 和 Windows 的托盘行为不同
+  if (process.platform === 'darwin') {
+    // macOS: 左键点击显示设置窗口
+    tray.on('click', () => {
+      showMainWindow()
+    })
+    
+    // 右键点击显示菜单
+    tray.on('right-click', () => {
+      tray?.popUpContextMenu(contextMenu)
+    })
+  } else {
+    // Windows: 左键点击显示设置窗口，右键显示菜单
+    tray.on('click', () => {
+      showMainWindow()
+    })
+    
+    // 设置右键菜单
+    tray.setContextMenu(contextMenu)
+  }
+}
 
-  // 点击托盘图标时显示主窗口
-  tray.on('click', () => {
-    if (mainWindow) {
-      mainWindow.show()
+// 显示主窗口
+function showMainWindow() {
+  if (!mainWindow || mainWindow.isDestroyed()) {
+    createWindow()
+  }
+  
+  if (mainWindow) {
+    if (mainWindow.isMinimized()) {
+      mainWindow.restore()
     }
-  })
+    mainWindow.show()
+    mainWindow.focus()
+  }
 }
 
 // 创建弹出窗口
@@ -65,8 +117,8 @@ function createPopupWindow(): void {
   }
 
   popupWindow = new BrowserWindow({
-    width: 500,
-    height: 500,
+    width: 600,
+    height: 600,
     frame: false,
     show: false,
     alwaysOnTop: true,
@@ -74,9 +126,15 @@ function createPopupWindow(): void {
     useContentSize: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      devTools: true // 确保开发者工具可用
     }
   })
+
+  // 打开开发者工具
+  if (is.dev) {
+    popupWindow.webContents.openDevTools()
+  }
 
   if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
     popupWindow.loadURL(`${process.env['ELECTRON_RENDERER_URL']}/#/popup`)
@@ -159,22 +217,52 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 900,
     height: 670,
-    show: false, // 默认不显示窗口
+    show: false,
+    frame: false, // 无边框
+    transparent: true, // 透明背景
     autoHideMenuBar: true,
     ...(process.platform === 'linux' ? { icon } : {}),
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
-      sandbox: false
+      sandbox: false,
+      devTools: true // 确保开发者工具可用
     }
   })
 
   mainWindow.on('ready-to-show', () => {
     // mainWindow.show() // 注释掉这行，使窗口默认不显示
+    // 根据环境决定是否打开开发者工具
+    if (isDevelopment) {
+      mainWindow.webContents.openDevTools()
+      // 注册开发者工具快捷键
+      globalShortcut.register('CommandOrControl+Shift+I', () => {
+        if (mainWindow && !mainWindow.isDestroyed()) {
+          mainWindow.webContents.toggleDevTools()
+        }
+      })
+    }
   })
 
   mainWindow.webContents.setWindowOpenHandler((details) => {
     shell.openExternal(details.url)
     return { action: 'deny' }
+  })
+
+  // 添加窗口控制事件处理
+  ipcMain.on('window-min', () => {
+    mainWindow?.minimize()
+  })
+
+  ipcMain.on('window-max', () => {
+    if (mainWindow?.isMaximized()) {
+      mainWindow?.restore()
+    } else {
+      mainWindow?.maximize()
+    }
+  })
+
+  ipcMain.on('window-close', () => {
+    mainWindow?.hide() // 点击关闭时隐藏窗口而不是退出应用
   })
 
   // HMR for renderer base on electron-vite cli.
@@ -184,6 +272,13 @@ function createWindow(): void {
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
+
+  // 注册 IPC 事件处理
+  ipcMain.handle('toggle-devtools', () => {
+    if (mainWindow && !mainWindow.isDestroyed()) {
+      mainWindow.webContents.toggleDevTools()
+    }
+  })
 }
 
 // 应用初始化
@@ -199,6 +294,14 @@ app.whenReady().then(() => {
   
   // 注册快捷键
   registerShortcut()
+  
+  // 注册开发者工具快捷键
+  globalShortcut.register('CommandOrControl+Shift+I', () => {
+    const focusedWindow = BrowserWindow.getFocusedWindow()
+    if (focusedWindow) {
+      focusedWindow.webContents.toggleDevTools()
+    }
+  })
   
   // 隐藏 dock 栏图标 (仅 macOS)
   if (process.platform === 'darwin') {
@@ -219,7 +322,7 @@ app.on('window-all-closed', () => {
   }
 })
 
-// 注销快捷键
+// 应用退出时注销快捷键
 app.on('will-quit', () => {
   if (registeredShortcut) {
     globalShortcut.unregister(registeredShortcut)
@@ -286,12 +389,66 @@ ipcMain.handle('get-ai-response', async (_, params: AIRequestParams) => {
 
 // 获取设置
 ipcMain.handle('get-settings', async () => {
-  return getSettings()
+  try {
+    const settings = await getSettings()
+    return settings
+  } catch (error) {
+    console.error('获取设置时出错:', error)
+    throw error
+  }
 })
 
 // 保存设置
 ipcMain.handle('save-settings', async (_, settings: StoredSettings) => {
-  return saveSettings(settings)
+  try {
+    const success = await saveSettings(settings)
+    return success
+  } catch (error) {
+    console.error('保存设置时出错:', error)
+    throw error
+  }
+})
+
+// 自动启动相关
+ipcMain.handle('get-auto-launch', async () => {
+  try {
+    const settings = await getSettings()
+    return settings.autoLaunch || false
+  } catch (error) {
+    console.error('获取自动启动设置失败:', error)
+    return false
+  }
+})
+
+ipcMain.handle('set-auto-launch', async (_, enable: boolean) => {
+  try {
+    const settings = await getSettings()
+    const updatedSettings = {
+      ...settings,
+      autoLaunch: enable
+    }
+    const success = await saveSettings(updatedSettings)
+    
+    if (success) {
+      // 根据操作系统设置自动启动
+      if (process.platform === 'darwin') {
+        app.setLoginItemSettings({
+          openAtLogin: enable,
+          openAsHidden: true
+        })
+      } else if (process.platform === 'win32') {
+        app.setLoginItemSettings({
+          openAtLogin: enable,
+          path: process.execPath
+        })
+      }
+    }
+    
+    return success
+  } catch (error) {
+    console.error('设置自动启动失败:', error)
+    return false
+  }
 })
 
 // 关闭弹窗

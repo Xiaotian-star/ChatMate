@@ -15,28 +15,48 @@ export interface Conversation {
 // 设置类型
 export interface StoredSettings {
   apiKey: string
-  prompts: Record<string, string>
+  prompts: {
+    [key: string]: string
+  }
   shortcut: string
-  conversations: Conversation[]
+  conversations: string[]
+  autoGenerate: boolean
+  autoGenerateShortcut: string
+  systemPrompt: string
+  autoLaunch?: boolean
 }
 
 // AI 请求参数类型
 export interface AIRequestParams {
   text: string
-  conversationId?: string
-  persona?: string
+  prompt: string
+  systemPrompt?: string
 }
 
 // 渲染进程API类型
 export interface ElectronAPI {
+  // AI 响应相关
   getAIResponse: (params: AIRequestParams) => Promise<string[]>
+  
+  // 设置相关
   getSettings: () => Promise<StoredSettings>
   saveSettings: (settings: StoredSettings) => Promise<boolean>
-  onTextSelected: (callback: (text: string) => void) => () => void
-  onAutoGenerate: (callback: () => void) => () => void
-  closePopup: () => void
-  moveWindow: (deltaX: number, deltaY: number) => void
-  checkForUpdates: () => Promise<UpdateInfo>
+  
+  // 自动启动相关
+  getAutoLaunch: () => Promise<boolean>
+  setAutoLaunch: (enable: boolean) => Promise<boolean>
+  
+  // 窗口控制
+  windowMin: () => void
+  windowMax: () => void
+  windowClose: () => void
+  
+  // 开发者工具
+  toggleDevTools: () => Promise<void>
+  
+  // 其他功能
+  onTextSelected: (callback: (text: string) => void) => void
+  onAutoGenerate: (callback: (text: string) => void) => void
 }
 
 // 更新信息类型

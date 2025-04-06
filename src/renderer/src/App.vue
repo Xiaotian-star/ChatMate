@@ -7,7 +7,6 @@
 </template>
 
 <style lang="less">
-@import './assets/css/styles.less';
 </style>
 
 <style>
@@ -16,7 +15,6 @@ html, body {
   padding: 0;
   height: 100%;
 }
-
 #app {
   font-family: Avenir, Helvetica, Arial, sans-serif;
   -webkit-font-smoothing: antialiased;

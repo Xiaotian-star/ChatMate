@@ -1,47 +1,101 @@
-import Store from 'electron-store'
+import { app } from 'electron'
+import { join } from 'path'
+import { writeFileSync, existsSync, mkdirSync } from 'fs'
 import type { StoredSettings } from '../types'
 
-// 默认设置
-const DEFAULT_SETTINGS: StoredSettings = {
-  apiKey: '',
-  prompts: {
-    '职场精英': '你是一位经验丰富的职场精英，擅长处理各种职场关系。请用专业、得体但不失温度的语言回复，不超过50字。',
-    '情感专家': '你是一位富有同理心的情感咨询师，擅长处理各种人际关系。请用温和、理解、富有同理心的方式回复，不超过50字。',
-    '外交官': '你是一位资深外交官，擅长处理敏感话题和冲突情况。请用圆润、委婉但不失立场的方式回复，不超过50字。',
-    '智者': '你是一位睿智的长者，擅长给出富有哲理的建议。请用平和、富有智慧的方式回复，不超过50字。',
-    '知心朋友': '你是一位知心好友，擅长倾听和开导。请用轻松、亲切的语气回复，不超过50字。',
-    '幽默达人': '你是一位幽默风趣的达人，擅长用轻松愉快的方式化解尴尬。请用诙谐、机智但不失分寸的方式回复，不超过50字。',
-    '高情商渣男': '你是一位高情商且精通法律的渣男，擅长识破并应对各种感情套路和陷阱。请用圆滑、机智但不失分寸的方式回复，注意规避法律风险，不超过50字。'
-  },
-  shortcut: 'F6',
-  conversations: []
+// 创建一个用于记录错误的简单日志函数
+function logError(error: unknown, context: string) {
+  const timestamp = new Date().toISOString()
+  const errorMessage = error instanceof Error ? error.message : String(error)
+  const logMessage = `[${timestamp}] ${context}: ${errorMessage}\n`
+  
+  try {
+    const logPath = join(app.getPath('userData'), 'logs')
+    if (!existsSync(logPath)) {
+      mkdirSync(logPath, { recursive: true })
+    }
+    const logFile = join(logPath, 'settings-error.log')
+    writeFileSync(logFile, logMessage, { flag: 'a' })
+  } catch (e) {
+    // 如果连日志都无法写入，我们只能忽略这个错误
+  }
 }
 
-// 创建配置存储实例
-const store = new Store<{ settings: StoredSettings }>({
-  name: 'settings',
-  defaults: {
-    settings: DEFAULT_SETTINGS
-  }
-})
+// 默认设置
+const defaultSettings: StoredSettings = {
+  apiKey: '',
+  prompts: {
+    '职场精英': '你现在是一位经验丰富的职场精英，擅长处理各种职场关系。请用专业、得体但不失温度的语言回复以下内容。注意措辞要准确、积极向上、富有建设性，同时也要体现出对他人的尊重和理解。',
+    '情感专家': '你现在是一位富有同理心的情感咨询师，擅长处理各种人际关系。请用温和、理解、富有同理心的方式回复以下内容。注意语言要温暖、富有支持性，同时也要给出建设性的建议。',
+    '暖心朋友': '你现在是一位知心好友，擅长倾听和开导。请用轻松、亲切的语气回复以下内容。注意语言要自然、真诚，像朋友间的对话一样温暖和真实。'
+  },
+  shortcut: 'F6',
+  conversations: [],
+  autoGenerate: false,
+  autoGenerateShortcut: 'CommandOrControl+G',
+  systemPrompt: ''
+}
+
+// 使用 JSON 文件直接存储设置
+const settingsPath = join(app.getPath('userData'), 'settings.json')
 
 // 获取设置
-export function getSettings(): StoredSettings {
+export async function getSettings(): Promise<StoredSettings> {
   try {
-    return store.get('settings')
+    // 确保设置文件存在
+    if (!existsSync(settingsPath)) {
+      writeFileSync(settingsPath, JSON.stringify(defaultSettings, null, 2), 'utf8')
+      return defaultSettings
+    }
+
+    // 读取设置文件
+    const fileContent = await import('fs/promises').then(fs => 
+      fs.readFile(settingsPath, 'utf8')
+    )
+    const settings = JSON.parse(fileContent)
+
+    // 合并默认设置
+    return {
+      ...defaultSettings,
+      ...settings
+    }
   } catch (error) {
-    console.error('获取设置失败:', error)
-    return DEFAULT_SETTINGS
+    logError(error, 'Failed to get settings')
+    return defaultSettings
   }
 }
 
 // 保存设置
-export function saveSettings(settings: StoredSettings): boolean {
+export async function saveSettings(settings: StoredSettings): Promise<boolean> {
   try {
-    store.set('settings', settings)
+    // 验证设置对象
+    if (!settings || typeof settings !== 'object') {
+      throw new Error('Invalid settings object')
+    }
+
+    // 确保所有必需的字段都存在
+    const validatedSettings: StoredSettings = {
+      ...defaultSettings,
+      ...settings
+    }
+
+    // 尝试序列化设置以验证其有效性
+    const settingsJson = JSON.stringify(validatedSettings, null, 2)
+
+    // 确保目录存在
+    const settingsDir = join(app.getPath('userData'))
+    if (!existsSync(settingsDir)) {
+      mkdirSync(settingsDir, { recursive: true })
+    }
+
+    // 保存设置
+    await import('fs/promises').then(fs => 
+      fs.writeFile(settingsPath, settingsJson, 'utf8')
+    )
+
     return true
   } catch (error) {
-    console.error('保存设置失败:', error)
+    logError(error, 'Failed to save settings')
     return false
   }
 } 

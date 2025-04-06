@@ -27,7 +27,7 @@
     "axios": "^1.8.4",
     "deepseek-chat": "^2.0.2",
     "dotenv": "^16.4.7",
-    "electron-store": "^8.1.0",
+    "electron-store": "^10.0.1",
     "electron-updater": "^6.1.7",
     "element-plus": "^2.9.7",
     "nanoid": "^5.1.5",

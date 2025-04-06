@@ -1,110 +1,188 @@
 <template>
-  <div class="settings">
-    <div class="window-controls">
-      <div class="drag-area"></div>
-      <div class="control-buttons">
-        <el-button 
-          type="text" 
-          class="minimize-btn"
-          @click="minimizeWindow"
-        >
-          <el-icon><Minus /></el-icon>
-        </el-button>
-        <el-button 
-          type="text" 
-          class="close-btn"
-          @click="closeWindow"
-        >
-          <el-icon><Close /></el-icon>
-        </el-button>
+  <div class="settings-container">
+    <!-- 自定义标题栏 -->
+    <div class="title-bar">
+      <div class="title">
+        <el-icon><Setting /></el-icon>
+        WeChat Assistant 设置
+      </div>
+      <div class="window-controls">
+        <el-tooltip content="最小化" placement="bottom" :hide-after="1000">
+          <button class="control-btn minimize" @click="minimize">
+            <el-icon><Minus /></el-icon>
+          </button>
+        </el-tooltip>
+        <el-tooltip content="最大化" placement="bottom" :hide-after="1000">
+          <button class="control-btn maximize" @click="toggleMaximize">
+            <el-icon><FullScreen /></el-icon>
+          </button>
+        </el-tooltip>
+        <el-tooltip content="关闭" placement="bottom" :hide-after="1000">
+          <button class="control-btn close" @click="closeWindow">
+            <el-icon><Close /></el-icon>
+          </button>
+        </el-tooltip>
       </div>
     </div>
 
-    <div class="settings-header">
-      <h2>设置</h2>
-      <p class="settings-desc">配置你的AI助手</p>
-      <div class="version-info">
-        <span>当前版本: v{{ currentVersion }}</span>
-        <el-button 
-          type="primary" 
-          :loading="checkingUpdate"
-          @click="checkUpdate"
-        >
-          检查更新
-        </el-button>
-      </div>
-    </div>
-    
-    <el-form :model="settings" label-width="120px" class="settings-form">
-      <div class="settings-section">
-        <h3 class="section-title">基础设置</h3>
-        <el-form-item label="DeepSeek API Key">
-          <el-input 
-            v-model="settings.apiKey" 
-            type="password" 
-            show-password 
-            class="api-key-input"
-            placeholder="请输入你的 DeepSeek API Key"
-          />
-        </el-form-item>
-
-        <el-form-item label="快捷键">
-          <el-input 
-            v-model="displayShortcut" 
-            placeholder="点击输入快捷键" 
-            readonly 
-            class="shortcut-input"
-            @keydown.stop="recordShortcut"
-            @keyup.stop="finishRecording"
-            @focus="startRecording"
-            @blur="stopRecording"
+    <div class="main-content">
+      <!-- 侧边栏导航 -->
+      <div class="sidebar">
+        <div class="version-info">
+          <img src="../assets/logo.png" class="app-icon" alt="logo">
+          <span class="version">v{{ currentVersion }}</span>
+          <el-button 
+            type="primary" 
+            link
+            :loading="checkingUpdate"
+            @click="checkUpdate"
+            size="small"
           >
-            <template #append>
-              <el-button @click="resetShortcut" type="primary" link>重置</el-button>
-            </template>
-          </el-input>
-          <div class="shortcut-tip" :class="{ 'recording': isRecording }">
-            {{ shortcutTip }}
-          </div>
-        </el-form-item>
-      </div>
-      
-      <div class="settings-section">
-        <div class="section-header">
-          <h3 class="section-title">预设人设</h3>
-          <el-button @click="resetPrompts" type="primary" link>恢复默认</el-button>
+            检查更新
+          </el-button>
         </div>
-        
-        <div class="prompts-grid">
-          <div v-for="[role] in Object.entries(settings.prompts || defaultPrompts)" 
-               :key="role" 
-               class="prompt-card">
-            <div class="prompt-header">
-              <span class="role-name">{{ role }}</span>
+        <el-menu
+          default-active="general"
+          class="settings-menu"
+        >
+          <el-menu-item index="general">
+            <el-icon><Setting /></el-icon>
+            <span>基础设置</span>
+          </el-menu-item>
+          <el-menu-item index="prompts">
+            <el-icon><ChatDotRound /></el-icon>
+            <span>预设人设</span>
+          </el-menu-item>
+          <el-menu-item index="advanced">
+            <el-icon><Tools /></el-icon>
+            <span>高级设置</span>
+          </el-menu-item>
+          <el-menu-item index="about">
+            <el-icon><InfoFilled /></el-icon>
+            <span>关于</span>
+          </el-menu-item>
+        </el-menu>
+      </div>
+
+      <!-- 主要内容区域 -->
+      <div class="content">
+        <el-form :model="settings" label-position="top" class="settings-form">
+          <!-- 基础设置 -->
+          <div class="settings-section">
+            <h2 class="section-title">基础设置</h2>
+            
+            <el-form-item label="DeepSeek API Key">
+              <el-input 
+                v-model="settings.apiKey" 
+                type="password" 
+                show-password 
+                class="api-key-input"
+                placeholder="请输入你的 DeepSeek API Key"
+              >
+                <template #append>
+                  <el-tooltip content="API Key 用于访问 DeepSeek 的服务" placement="top">
+                    <el-icon><QuestionFilled /></el-icon>
+                  </el-tooltip>
+                </template>
+              </el-input>
+            </el-form-item>
+
+            <el-form-item label="开机自启">
+              <el-switch
+                v-model="settings.autoLaunch"
+                @change="handleAutoLaunchChange"
+                active-text="开启"
+                inactive-text="关闭"
+              />
+              <div class="setting-tip">
+                开启后，系统启动时会自动启动 WeChat Assistant
+              </div>
+            </el-form-item>
+
+            <el-form-item label="快捷键">
+              <el-input 
+                v-model="displayShortcut" 
+                placeholder="点击输入快捷键" 
+                readonly 
+                class="shortcut-input"
+                @keydown.stop="recordShortcut"
+                @keyup.stop="finishRecording"
+                @focus="startRecording"
+                @blur="stopRecording"
+              >
+                <template #append>
+                  <el-button @click="resetShortcut" type="primary" link>重置</el-button>
+                </template>
+              </el-input>
+              <div class="shortcut-tip" :class="{ 'recording': isRecording }">
+                {{ shortcutTip }}
+              </div>
+            </el-form-item>
+          </div>
+
+          <!-- 预设人设 -->
+          <div class="settings-section">
+            <div class="section-header">
+              <h2 class="section-title">预设人设</h2>
+              <el-button type="primary" link @click="resetPrompts">
+                <el-icon><Refresh /></el-icon>
+                恢复默认
+              </el-button>
             </div>
-            <el-input
-              v-model="settings.prompts![role]"
-              :placeholder="defaultPrompts[role]"
-              type="textarea"
-              :rows="4"
-              class="prompt-input"
-            />
+            
+            <div class="prompts-grid">
+              <el-card
+                v-for="[role] in Object.entries(settings.prompts || defaultPrompts)"
+                :key="role"
+                class="prompt-card"
+                shadow="hover"
+              >
+                <template #header>
+                  <div class="prompt-header">
+                    <span class="role-name">{{ role }}</span>
+                  </div>
+                </template>
+                <el-input
+                  v-model="settings.prompts![role]"
+                  :placeholder="defaultPrompts[role]"
+                  type="textarea"
+                  :rows="4"
+                  class="prompt-input"
+                />
+              </el-card>
+            </div>
           </div>
-        </div>
+
+          <!-- 保存按钮 -->
+          <div class="settings-footer">
+            <el-button type="primary" @click="saveSettings" size="large">
+              <el-icon><Check /></el-icon>
+              保存设置
+            </el-button>
+          </div>
+        </el-form>
       </div>
-      
-      <div class="settings-footer">
-        <el-button type="primary" @click="saveSettings" size="large">保存设置</el-button>
-      </div>
-    </el-form>
+    </div>
   </div>
 </template>
 
 <script setup lang="ts">
 import { ref, computed, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Minus, Close } from '@element-plus/icons-vue'
+import {
+  Setting,
+  ChatDotRound,
+  Tools,
+  InfoFilled,
+  QuestionFilled,
+  Check,
+  Refresh,
+  Minus,
+  FullScreen,
+  Close
+} from '@element-plus/icons-vue'
 import type { StoredSettings, ElectronAPI } from '../../../types'
+import type { IpcRenderer } from 'electron'
 
 declare global {
   interface Window {
@@ -115,6 +193,7 @@ declare global {
           app: string
         }
       }
+      ipcRenderer: IpcRenderer
     }
   }
 }
@@ -142,7 +221,11 @@ const settings = ref<StoredSettings>({
   apiKey: DEFAULT_API_KEY,
   prompts: { ...defaultPrompts },
   shortcut: DEFAULT_SHORTCUT,
-  conversations: []
+  conversations: [],
+  autoGenerate: false,
+  autoGenerateShortcut: 'CommandOrControl+G',
+  systemPrompt: '',
+  autoLaunch: false
 })
 
 // 快捷键录制相关
@@ -254,14 +337,20 @@ async function checkUpdate() {
 const loadSettings = async () => {
   try {
     const savedSettings = await window.electronAPI.getSettings()
+    const autoLaunch = await window.electronAPI.getAutoLaunch()
     console.log('加载到的设置:', savedSettings)
+    console.log('自启动状态:', autoLaunch)
     
     if (savedSettings) {
       settings.value = {
         apiKey: savedSettings.apiKey || DEFAULT_API_KEY,
         prompts: savedSettings.prompts || { ...defaultPrompts },
         shortcut: savedSettings.shortcut || DEFAULT_SHORTCUT,
-        conversations: savedSettings.conversations || []
+        conversations: savedSettings.conversations || [],
+        autoGenerate: savedSettings.autoGenerate || false,
+        autoGenerateShortcut: savedSettings.autoGenerateShortcut || 'CommandOrControl+G',
+        systemPrompt: savedSettings.systemPrompt || '',
+        autoLaunch: autoLaunch
       }
       displayShortcut.value = settings.value.shortcut
     } else {
@@ -270,7 +359,11 @@ const loadSettings = async () => {
         apiKey: DEFAULT_API_KEY,
         prompts: { ...defaultPrompts },
         shortcut: DEFAULT_SHORTCUT,
-        conversations: []
+        conversations: [],
+        autoGenerate: false,
+        autoGenerateShortcut: 'CommandOrControl+G',
+        systemPrompt: '',
+        autoLaunch: autoLaunch
       }
       displayShortcut.value = DEFAULT_SHORTCUT
     }
@@ -281,7 +374,11 @@ const loadSettings = async () => {
       apiKey: DEFAULT_API_KEY,
       prompts: { ...defaultPrompts },
       shortcut: DEFAULT_SHORTCUT,
-      conversations: []
+      conversations: [],
+      autoGenerate: false,
+      autoGenerateShortcut: 'CommandOrControl+G',
+      systemPrompt: '',
+      autoLaunch: false
     }
     displayShortcut.value = DEFAULT_SHORTCUT
     
@@ -297,11 +394,36 @@ const loadSettings = async () => {
 // 保存设置
 const saveSettings = async () => {
   try {
-    await window.electronAPI.saveSettings(settings.value)
-    ElMessage.success('设置已保存')
+    // 创建一个只包含需要保存的数据的对象
+    const settingsToSave = {
+      apiKey: settings.value.apiKey,
+      prompts: { ...settings.value.prompts },
+      shortcut: settings.value.shortcut,
+      conversations: settings.value.conversations.map(conv => ({
+        id: conv.id,
+        title: conv.title,
+        messages: conv.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        lastUpdated: conv.lastUpdated
+      })),
+      autoGenerate: settings.value.autoGenerate,
+      autoGenerateShortcut: settings.value.autoGenerateShortcut,
+      systemPrompt: settings.value.systemPrompt,
+      autoLaunch: settings.value.autoLaunch
+    }
+
+    console.log('正在保存设置:', JSON.stringify(settingsToSave))
+    const success = await window.electronAPI.saveSettings(settingsToSave)
+    if (success) {
+      ElMessage.success('设置保存成功')
+    } else {
+      ElMessage.error('设置保存失败')
+    }
   } catch (error) {
-    console.error('保存设置失败:', error)
-    ElMessage.error('保存设置失败')
+    console.error('保存设置时出错:', error)
+    ElMessage.error('保存设置时出错')
   }
 }
 
@@ -311,14 +433,32 @@ const resetPrompts = () => {
   ElMessage.success('已恢复默认提示词')
 }
 
-// 最小化窗口
-const minimizeWindow = () => {
-  window.electronAPI.closePopup()
+// 窗口控制函数
+const minimize = () => {
+  window.electronAPI.windowMin()
 }
 
-// 关闭窗口
+const toggleMaximize = () => {
+  window.electronAPI.windowMax()
+}
+
 const closeWindow = () => {
-  window.electronAPI.closePopup()
+  window.electronAPI.windowClose()
+}
+
+// 在 script setup 中添加
+const handleAutoLaunchChange = async (value: boolean) => {
+  try {
+    const success = await window.electronAPI.setAutoLaunch(value)
+    if (!success) {
+      settings.value.autoLaunch = !value // 恢复之前的状态
+      ElMessage.error('设置自启动失败')
+    }
+  } catch (error) {
+    console.error('设置自启动时出错:', error)
+    settings.value.autoLaunch = !value // 恢复之前的状态
+    ElMessage.error('设置自启动时出错')
+  }
 }
 
 // 组件挂载时加载设置
@@ -328,123 +468,145 @@ onMounted(async () => {
 </script>
 
 <style scoped>
-/* 修改窗口控制样式 */
-.window-controls {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  height: 32px;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background: var(--el-bg-color);
-  border-bottom: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px 8px 0 0;
-  z-index: 1000;
-  -webkit-app-region: drag; /* 整个标题栏可拖拽 */
-}
-
-.drag-area {
-  flex: 1;
-  height: 100%;
-}
-
-.control-buttons {
-  display: flex;
-  align-items: center;
-  -webkit-app-region: no-drag; /* 控制按钮不可拖拽 */
-}
-
-.minimize-btn,
-.close-btn {
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 0;
-  margin: 0;
-  padding: 0;
-  -webkit-app-region: no-drag; /* 按钮不可拖拽 */
-}
-
-.minimize-btn:hover {
-  background-color: var(--el-color-info-light-9);
-}
-
-.close-btn:hover {
-  background-color: var(--el-color-danger);
-  color: white;
-}
-
-/* 修改主容器样式 */
-.settings {
-  padding: 52px 30px 30px;  /* 增加顶部内边距以适应标题栏 */
-  max-width: 1200px;
-  margin: 0 auto;
+.settings-container {
   height: 100vh;
-  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
   background: var(--el-bg-color);
-  border: 1px solid var(--el-border-color-lighter);
-  border-radius: 8px;
 }
 
-/* 确保表单区域不可拖拽 */
-.settings-form {
+.title-bar {
+  height: 40px;
+  background: var(--el-color-primary-light-9);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0 16px;
+  -webkit-app-region: drag;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+
+.title {
+  font-size: 14px;
+  color: var(--el-text-color-primary);
+  font-weight: 500;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.window-controls {
+  display: flex;
+  gap: 8px;
   -webkit-app-region: no-drag;
 }
 
-.settings-header {
-  margin-bottom: 30px;
-  text-align: center;
-}
-
-.settings-header h2 {
-  font-size: 28px;
-  color: var(--el-text-color-primary);
-  margin: 0;
-}
-
-.settings-desc {
+.control-btn {
+  width: 32px;
+  height: 32px;
+  border: none;
+  background: transparent;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  border-radius: 4px;
   color: var(--el-text-color-secondary);
-  margin: 8px 0 0;
+}
+
+.control-btn:hover {
+  background: var(--el-color-primary-light-8);
+}
+
+.control-btn.close:hover {
+  background: var(--el-color-danger);
+  color: white;
+}
+
+.main-content {
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+}
+
+.sidebar {
+  width: 220px;
+  border-right: 1px solid var(--el-border-color-light);
+  display: flex;
+  flex-direction: column;
+  background: var(--el-bg-color);
+}
+
+.version-info {
+  padding: 16px;
+  text-align: center;
+  border-bottom: 1px solid var(--el-border-color-light);
+}
+
+.app-icon {
+  width: 64px;
+  height: 64px;
+  margin-bottom: 8px;
+}
+
+.version {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  display: block;
+  margin-bottom: 8px;
+}
+
+.settings-menu {
+  flex: 1;
+  border-right: none;
+}
+
+.content {
+  flex: 1;
+  padding: 24px;
+  overflow-y: auto;
 }
 
 .settings-section {
-  background: var(--el-bg-color);
+  background: var(--el-bg-color-overlay);
   border-radius: 8px;
   padding: 24px;
   margin-bottom: 24px;
-  box-shadow: 0 2px 12px 0 rgba(0,0,0,0.05);
+  box-shadow: var(--el-box-shadow-light);
 }
 
 .section-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  margin-bottom: 20px;
+  margin-bottom: 24px;
 }
 
 .section-title {
-  font-size: 18px;
+  font-size: 20px;
   color: var(--el-text-color-primary);
-  margin: 0 0 20px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.api-key-input {
+  max-width: 500px;
 }
 
 .shortcut-input {
   max-width: 300px;
 }
 
-.api-key-input {
-  max-width: 400px;
+.setting-tip {
+  font-size: 12px;
+  color: var(--el-text-color-secondary);
+  margin-top: 4px;
 }
 
 .shortcut-tip {
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  margin-top: 8px;
-  transition: all 0.3s ease;
+  margin-top: 4px;
 }
 
 .shortcut-tip.recording {
@@ -454,20 +616,18 @@ onMounted(async () => {
 
 .prompts-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
-  gap: 20px;
-  margin-top: 20px;
+  grid-template-columns: repeat(auto-fill, minmax(350px, 1fr));
+  gap: 16px;
 }
 
 .prompt-card {
-  background: var(--el-bg-color-page);
-  border-radius: 6px;
-  padding: 16px;
-  border: 1px solid var(--el-border-color-lighter);
+  background: var(--el-bg-color);
 }
 
 .prompt-header {
-  margin-bottom: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
 }
 
 .role-name {
@@ -476,19 +636,12 @@ onMounted(async () => {
   color: var(--el-text-color-primary);
 }
 
-.prompt-input {
-  width: 100%;
-}
-
 .settings-footer {
-  margin-top: 30px;
+  margin-top: 32px;
   text-align: center;
-}
-
-.version-info {
-  display: flex;
-  align-items: center;
-  gap: 16px;
-  margin-top: 8px;
+  padding: 16px;
+  background: var(--el-bg-color-overlay);
+  border-radius: 8px;
+  box-shadow: var(--el-box-shadow-light);
 }
 </style> 
