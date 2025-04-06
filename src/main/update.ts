@@ -1,12 +1,16 @@
 import { app, shell, dialog } from 'electron'
 import axios from 'axios'
 import type { UpdateInfo } from '../types'
+import * as dotenv from 'dotenv'
+
+// 加载环境变量
+dotenv.config()
 
 // GitHub API 配置
 const GITHUB_API_CONFIG = {
   headers: {
     'Accept': 'application/vnd.github.v3+json',
-    'Authorization': `Bearer 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`,
+    'Authorization': process.env.GITHUB_TOKEN ? `Bearer ${process.env.GITHUB_TOKEN}` : '',
     'User-Agent': 'ChatMate-App'
   }
 }
@@ -14,6 +18,11 @@ const GITHUB_API_CONFIG = {
 // 检查更新
 export async function update(): Promise<UpdateInfo> {
   try {
+    // 检查 GitHub Token 是否存在
+    if (!process.env.GITHUB_TOKEN) {
+      console.warn('未设置 GITHUB_TOKEN 环境变量，可能会受到 API 访问限制')
+    }
+
     // 获取当前版本号
     const currentVersion = app.getVersion()
     console.log('当前版本号:', currentVersion)

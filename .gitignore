@@ -3,3 +3,17 @@ dist
 out
 .DS_Store
 *.log*
+
+# 环境变量文件
+.env
+.env.local
+.env.*.local
+
+# 编辑器配置
+.vscode
+.idea
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?

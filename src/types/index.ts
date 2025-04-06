@@ -13,14 +13,6 @@ export interface Conversation {
 }
 
 // 设置类型
-export interface Settings {
-  apiKey: string
-  prompts: Record<string, string>
-  shortcut: string
-  conversations: Conversation[]
-}
-
-// 存储的设置类型
 export interface StoredSettings {
   apiKey: string
   prompts: Record<string, string>
@@ -34,9 +26,6 @@ export interface AIRequestParams {
   conversationId?: string
   persona?: string
 }
-
-// 窗口命令类型
-export type WindowCommand = 'minimize' | 'hide' | 'close-popup'
 
 // 渲染进程API类型
 export interface ElectronAPI {

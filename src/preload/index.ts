@@ -26,7 +26,7 @@ declare global {
   }
 }
 
-// 导出 electronAPI 给渲染进程使用
+// 导出自定义 API
 const api = {
   // 获取AI回复
   getAIResponse: (params: AIRequestParams) => {

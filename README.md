@@ -40,7 +40,30 @@ cd chatmate
 
 # 安装依赖
 npm install
+
+# 配置环境变量
+cp .env.example .env
 ```
+
+## 环境变量配置
+
+在开始开发之前，你需要配置以下环境变量：
+
+1. 复制 `.env.example` 文件并重命名为 `.env`
+2. 在 `.env` 文件中填写以下配置：
+
+```env
+# GitHub API Token - 用于检查更新
+GITHUB_TOKEN=your_github_token
+
+# DeepSeek API Key - 用于 AI 对话
+DEEPSEEK_API_KEY=your_deepseek_api_key
+
+# 其他环境变量
+NODE_ENV=development
+```
+
+注意：不要将包含敏感信息的 `.env` 文件提交到版本控制系统中。
 
 ## 开发
 

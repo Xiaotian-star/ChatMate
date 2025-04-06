@@ -64,7 +64,7 @@
         <textarea 
           v-model="selectedText"
           placeholder="请输入或粘贴需要回复的内容..."
-          @keydown.enter.ctrl="getReply"
+          @keydown="handleKeyDown"
           rows="4"
         ></textarea>
       </div>
@@ -93,7 +93,8 @@
       </div>
 
       <div v-if="loading" class="loading">
-        生成回复中...
+        <div class="loading-spinner"></div>
+        <div class="loading-text">生成回复中...</div>
       </div>
       
       <div v-else-if="error" class="error">
@@ -105,10 +106,15 @@
           v-for="(reply, index) in replies" 
           :key="index"
           class="reply-item"
+          :class="{ 
+            selected: selectedIndex === index,
+            copied: copiedIndex === index 
+          }"
           @click="selectReply(reply, index)"
         >
+          <div class="reply-number">{{ index + 1 }}</div>
           <div class="reply-text">{{ reply }}</div>
-          <div class="copy-tip" v-if="copiedIndex === index">已复制!</div>
+          <div class="copy-tip">{{ copiedIndex === index ? '已复制!' : '点击复制' }}</div>
         </div>
       </div>
     </div>
@@ -131,6 +137,7 @@ const loading = ref(false)
 const error = ref('')
 const replies = ref<string[]>([])
 const copiedIndex = ref(-1)
+const selectedIndex = ref(-1)
 const showSessions = ref(false)
 const sessions = ref<Conversation[]>([])
 const currentSessionId = ref('default')
@@ -237,17 +244,15 @@ onMounted(async () => {
   await loadSettings()
   const cleanup = window.electronAPI.onTextSelected((text: string) => {
     console.log('收到选中的文本:', text)
-    selectedText.value = text || ''  // 如果没有选中文本，设置为空字符串
+    selectedText.value = text || ''
   })
 
-  // 监听自动生成事件
   const cleanupAutoGenerate = window.electronAPI.onAutoGenerate(() => {
     if (selectedText.value.trim()) {
       getReply()
     }
   })
 
-  // 组件卸载时清理事件监听
   onUnmounted(() => {
     cleanup()
     cleanupAutoGenerate()
@@ -272,9 +277,17 @@ async function getReply() {
   try {
     const response = await window.electronAPI.getAIResponse({
       text: selectedText.value,
-      conversationId: currentSessionId.value
+      conversationId: currentSessionId.value,
+      persona: selectedPersona.value
     })
-    replies.value = response
+    
+    // 确保 response 是数组
+    if (Array.isArray(response)) {
+      replies.value = response
+    } else {
+      console.error('回复格式错误:', response)
+      error.value = '回复格式错误'
+    }
   } catch (err) {
     console.error('获取回复失败:', err)
     error.value = err instanceof Error ? err.message : '获取回复失败'
@@ -285,6 +298,7 @@ async function getReply() {
 
 // 选择回复并复制到剪贴板
 async function selectReply(reply: string, index: number) {
+  selectedIndex.value = index
   navigator.clipboard.writeText(reply).then(() => {
     copiedIndex.value = index
     setTimeout(() => {
@@ -355,6 +369,17 @@ async function deleteSession(sessionId: string) {
     error.value = '删除会话失败'
   }
 }
+
+// 添加键盘事件处理函数
+function handleKeyDown(e: KeyboardEvent) {
+  // 检查是否按下 Ctrl+Enter
+  if (e.ctrlKey && e.key === 'Enter') {
+    e.preventDefault() // 阻止默认行为
+    if (selectedText.value.trim()) {
+      getReply()
+    }
+  }
+}
 </script>
 
 <style>
@@ -363,8 +388,8 @@ async function deleteSession(sessionId: string) {
   border-radius: 8px;
   box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
   padding: 16px;
-  width: 100%;
-  height: 100%;
+  width: 500px;
+  height: 500px;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -417,7 +442,9 @@ async function deleteSession(sessionId: string) {
 
 .content {
   flex: 1;
-  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
   position: relative;
 }
 
@@ -432,12 +459,6 @@ async function deleteSession(sessionId: string) {
   z-index: 10;
   max-height: 300px;
   overflow-y: auto;
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE and Edge */
-}
-
-.sessions::-webkit-scrollbar {
-  display: none; /* Chrome, Safari, Opera */
 }
 
 .session-list {
@@ -518,6 +539,7 @@ async function deleteSession(sessionId: string) {
 }
 
 .input-area {
+  flex-shrink: 0;
   margin-bottom: 16px;
 }
 
@@ -529,7 +551,7 @@ textarea {
   resize: none;
   font-size: 14px;
   line-height: 1.5;
-  margin-bottom: 8px;
+  height: 100px;
   background: #f9f9f9;
 }
 
@@ -540,6 +562,7 @@ textarea:focus {
 }
 
 .reply-options {
+  flex-shrink: 0;
   margin-bottom: 16px;
 }
 
@@ -595,38 +618,65 @@ textarea:focus {
 }
 
 .loading {
-  text-align: center;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
   color: #666;
-  padding: 20px;
+}
+
+.loading-spinner {
+  width: 24px;
+  height: 24px;
+  border: 2px solid #f3f3f3;
+  border-top: 2px solid #1890ff;
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+  margin-bottom: 12px;
+}
+
+.loading-text {
+  font-size: 14px;
+  color: #666;
+}
+
+@keyframes spin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 .error {
-  color: #ff4d4f;
-  padding: 12px;
+  margin: 16px 0;
+  padding: 12px 16px;
   background: #fff2f0;
+  border: 1px solid #ffccc7;
   border-radius: 6px;
+  color: #ff4d4f;
+  font-size: 14px;
+  line-height: 1.5;
 }
 
 .replies {
-  max-height: calc(100% - 200px);
+  flex: 1;
   overflow-y: auto;
-  scrollbar-width: none;
-  -ms-overflow-style: none;
-  padding-right: 4px;
-}
-
-.replies::-webkit-scrollbar {
-  display: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding-right: 8px;
 }
 
 .reply-item {
   position: relative;
-  padding: 12px;
+  padding: 16px;
   background: #f5f5f5;
-  border-radius: 6px;
+  border-radius: 8px;
   cursor: pointer;
   transition: all 0.2s;
   border: 1px solid transparent;
+  display: flex;
+  align-items: center;
+  gap: 12px;
 }
 
 .reply-item:hover {
@@ -634,20 +684,53 @@ textarea:focus {
   border-color: #1890ff;
 }
 
+.reply-item.selected {
+  background: #e6f7ff;
+  border-color: #1890ff;
+}
+
+.reply-number {
+  flex-shrink: 0;
+  width: 24px;
+  height: 24px;
+  border-radius: 12px;
+  background: #1890ff;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+}
+
 .reply-text {
-  word-break: break-all;
+  flex: 1;
+  font-size: 14px;
+  line-height: 1.6;
+  color: #333;
 }
 
 .copy-tip {
   position: absolute;
-  right: 8px;
+  right: 12px;
   top: 50%;
   transform: translateY(-50%);
-  background: #52c41a;
-  color: white;
-  padding: 2px 8px;
+  background: rgba(82, 196, 26, 0.1);
+  color: #52c41a;
+  padding: 4px 8px;
   border-radius: 4px;
   font-size: 12px;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.reply-item:hover .copy-tip {
+  opacity: 1;
+}
+
+.reply-item.copied .copy-tip {
+  opacity: 1;
+  background: #52c41a;
+  color: white;
 }
 
 .delete-btn {
