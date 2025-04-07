@@ -1,147 +1,147 @@
 <template>
   <div class="popup-container">
+    <!-- 顶部导航栏 -->
     <div class="popup-header" @mousedown="startDrag">
-      <div class="header-actions">
-        <button class="session-btn" @click="showSessions = !showSessions">
-          {{ getCurrentSessionName() }}
+      <div class="header-left">
+        <div class="session-selector" @click="showSessions = !showSessions">
+          <svg class="session-icon" viewBox="0 0 24 24" width="16" height="16">
+            <path d="M20 2H4c-1.1 0-2 .9-2 2v18l4-4h14c1.1 0 2-.9 2-2V4c0-1.1-.9-2-2-2zm0 14H6l-2 2V4h16v12z" fill="currentColor"/>
+          </svg>
+          <span class="session-name">{{ getCurrentSessionName() }}</span>
+          <svg 
+            class="arrow-icon" 
+            :class="{ 'is-open': showSessions }"
+            viewBox="0 0 24 24" 
+            width="16" 
+            height="16"
+          >
+            <path d="M7.41 8.59L12 13.17l4.59-4.58L18 10l-6 6-6-6 1.41-1.41z" fill="currentColor"/>
+          </svg>
+        </div>
+      </div>
+      <div class="header-right">
+        <button class="close-btn" @click="closePopup">
+          <svg viewBox="0 0 24 24" width="20" height="20">
+            <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
+          </svg>
         </button>
-        <button class="close-btn" @click="closePopup">×</button>
       </div>
     </div>
 
     <div class="content">
-      <!-- 会话列表 -->
-      <div v-if="showSessions" class="sessions">
-        <div class="session-list">
-          <div 
-            class="session-item"
-            :class="{ active: currentSessionId === 'default' }"
-            @click="selectSession('default')"
-          >
-            <div class="session-title">默认会话</div>
-          </div>
-          <div 
-            v-for="session in customSessions" 
-            :key="session.id"
-            :class="['session-item', { active: session.id === currentSessionId }]"
-            @click="selectSession(session.id)"
-          >
-            <div class="session-title">{{ session.title }}</div>
-            <div class="session-time">{{ formatTime(session.lastUpdated) }}</div>
-            <!-- <div class="session-context" v-if="session.messages?.length">
-              <div class="context-item" v-for="(msg, idx) in session.messages.slice(-2)" :key="idx">
-                <div class="context-role">{{ msg.role === 'user' ? '我' : 'AI' }}:</div>
-                <div class="context-content">{{ msg.content }}</div>
+      <!-- 会话列表下拉面板 -->
+      <Transition 
+        enter-active-class="animate-dropdown-enter" 
+        leave-active-class="animate-dropdown-leave"
+      >
+        <div v-if="showSessions" class="sessions-dropdown">
+          <div class="sessions-list">
+            <div 
+              class="session-item default"
+              :class="{ active: currentSessionId === 'default' }"
+              @click="selectSession('default')"
+            >
+              <div class="session-info">
+                <svg class="default-icon" viewBox="0 0 24 24" width="16" height="16">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm4.59-12.42L10 14.17l-2.59-2.58L6 13l4 4 8-8z" fill="currentColor"/>
+                </svg>
+                <span class="session-title">默认会话</span>
               </div>
-            </div> -->
-            <button 
-              class="delete-btn" 
-              @click.stop="deleteSession(session.id)"
-              v-if="session.id !== 'default'"
+            </div>
+            
+            <div 
+              v-for="session in customSessions" 
+              :key="session.id"
+              class="session-item"
+              :class="{ active: session.id === currentSessionId }"
+              @click="selectSession(session.id)"
             >
-              ×
+              <div class="session-info">
+                <span class="session-title">{{ session.title }}</span>
+                <span class="session-time">{{ formatTime(session.lastUpdated) }}</span>
+              </div>
+              <button 
+                class="delete-session-btn" 
+                @click.stop="deleteSession(session.id)"
+                v-if="session.id !== 'default'"
+              >
+                <svg viewBox="0 0 24 24" width="16" height="16">
+                  <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z" fill="currentColor"/>
+                </svg>
+              </button>
+            </div>
+
+            <div class="session-item new" @click="createNewSession" v-if="sessions.length < 10">
+              <div class="new-session-content">
+                <svg class="add-icon" viewBox="0 0 24 24" width="16" height="16">
+                  <path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z" fill="currentColor"/>
+                </svg>
+                <span>新建会话</span>
+              </div>
+            </div>
+          </div>
+        </div>
+      </Transition>
+
+      <!-- 主要内容区域 -->
+      <div class="main-content">
+        <!-- 输入区域 -->
+        <div class="input-section">
+          <div class="input-area">
+            <textarea 
+              v-model="selectedText"
+              placeholder="请输入或粘贴需要回复的内容..."
+              @keydown="handleKeyDown"
+              rows="4"
+            ></textarea>
+          </div>
+          
+          <div class="control-panel">
+            <div class="left-controls">
+              <select 
+                v-model="selectedPersona"
+                class="persona-select"
+              >
+                <option value="">选择回复风格...</option>
+                <option 
+                  v-for="[key, prompt] in Object.entries(settings?.prompts || {})"
+                  :key="key"
+                  :value="prompt.title"
+                >
+                  {{ prompt.title }}
+                </option>
+              </select>
+              <!-- <span class="tip">提示: Enter 快速生成回复</span> -->
+            </div>
+            <button 
+              class="generate-btn" 
+              @click="getReply"
+              :disabled="!selectedText.trim() || !activeModels.length"
+            >
+              生成回复
             </button>
           </div>
-          <div class="session-item new" @click="createNewSession" v-if="sessions.length < 10">
-            <input 
-              v-if="isCreatingSession"
-              ref="sessionNameInput"
-              v-model="newSessionName"
-              @keydown.enter="confirmNewSession"
-              @blur="cancelNewSession"
-              @keydown.esc="cancelNewSession"
-              placeholder="输入会话名称后回车"
-              class="session-name-input"
+        </div>
+
+        <!-- 回复区域 -->
+        <div class="reply-section">
+          <!-- 多模型回复区域 -->
+          <div class="models-replies" v-if="activeModels.length > 0">
+            <ModelReply
+              v-for="model in activeModels"
+              :key="model.id"
+              :model="model"
+              :text="selectedText"
+              :persona="selectedPersona"
+              ref="modelReplies"
             />
-            <template v-else>
-              + 新建会话
-            </template>
           </div>
-        </div>
-      </div>
-
-      <div class="input-area">
-        <textarea 
-          v-model="selectedText"
-          placeholder="请输入或粘贴需要回复的内容..."
-          @keydown="handleKeyDown"
-          rows="4"
-        ></textarea>
-      </div>
-
-      <div class="reply-options">
-        <div class="role-buttons">
-          <div class="role-row">
-            <button 
-              v-for="[key, prompt] in Object.entries(settings?.prompts || {}).slice(0, 3)"
-              :key="key"
-              :class="{ active: selectedPersona === prompt.title }"
-              @click="selectPersona(prompt.title)"
-            >
-              {{ prompt.title }}
-            </button>
+          <div v-else class="no-models-tip">
+            <svg class="warning-icon" viewBox="0 0 24 24" width="24" height="24">
+              <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-2h2v2zm0-4h-2V7h2v6z" fill="currentColor"/>
+            </svg>
+            <span>请在设置中启用至少一个模型</span>
           </div>
-          <div class="role-row">
-            <button 
-              v-for="[key, prompt] in Object.entries(settings?.prompts || {}).slice(3)"
-              :key="key"
-              :class="{ active: selectedPersona === prompt.title }"
-              @click="selectPersona(prompt.title)"
-            >
-              {{ prompt.title }}
-            </button>
-          </div>
-        </div>
-        <div class="input-actions">
-          <span class="tip">提示: Enter 快速生成回复</span>
-          <button 
-            class="generate-btn" 
-            @click="getReply"
-            :disabled="!selectedText.trim() || !activeModels.length"
-          >
-            生成回复
-          </button>
-        </div>
-      </div>
-
-      <!-- 多模型回复区域 -->
-      <div class="models-replies" v-if="activeModels.length > 0">
-        <ModelReply
-          v-for="model in activeModels"
-          :key="model.id"
-          :model="model"
-          :text="selectedText"
-          :persona="selectedPersona"
-          ref="modelReplies"
-        />
-      </div>
-      <div v-else class="no-models-tip">
-        请在设置中启用至少一个模型
-      </div>
-
-      <div v-if="loading" class="loading">
-        <div class="loading-spinner"></div>
-        <div class="loading-text">{{ loadingText }}</div>
-      </div>
-      
-      <div v-else-if="error" class="error">
-        {{ error }}
-      </div>
-      
-      <div v-else-if="replies.length > 0" class="replies">
-        <div 
-          v-for="(reply, index) in replies" 
-          :key="index"
-          class="reply-item"
-          :class="{ 
-            selected: selectedIndex === index,
-            copied: copiedIndex === index 
-          }"
-          @click="selectReply(reply, index)"
-        >
-          <!-- <div class="reply-number">{{ index + 1 }}</div> -->
-          <div class="reply-text">{{ reply }}</div>
-          <div class="copy-tip">{{ copiedIndex === index ? '已复制!' : '点击复制' }}</div>
         </div>
       </div>
     </div>
@@ -565,242 +565,295 @@ function handleKeyDown(e: KeyboardEvent) {
 }
 </script>
 
-<style>
+<style scoped>
 .popup-container {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  padding: 16px;
-  width: 100%;
-  height: 100%;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.08);
   display: flex;
   flex-direction: column;
+  height: 100%;
   overflow: hidden;
-  box-sizing: border-box;
+  position: relative;
 }
 
 .popup-header {
   display: flex;
-  justify-content: flex-end;
+  justify-content: space-between;
   align-items: center;
-  margin-bottom: 16px;
-  cursor: move;
-  user-select: none;
+  padding: 12px 16px;
+  background: #fff;
+  border-bottom: 1px solid #f0f0f0;
   -webkit-app-region: drag;
-  padding: 4px;
 }
 
-.header-actions {
-  display: flex;
-  gap: 8px;
+.header-left {
   -webkit-app-region: no-drag;
 }
 
-.session-btn {
-  background: none;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  padding: 4px 8px;
-  font-size: 12px;
-  cursor: pointer;
-  color: #666;
+.header-right {
+  -webkit-app-region: no-drag;
 }
 
-.session-btn:hover {
+.session-selector {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
   background: #f5f5f5;
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  min-width: 160px;
 }
 
-.popup-header h2 {
-  margin: 0;
-  font-size: 18px;
+.session-selector:hover {
+  background: #e6f7ff;
+}
+
+.session-icon {
+  color: #1890ff;
+  flex-shrink: 0;
+}
+
+.session-name {
+  font-size: 14px;
   color: #333;
+  font-weight: 500;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.arrow-icon {
+  color: #999;
+  transition: transform 0.2s;
+  flex-shrink: 0;
+}
+
+.arrow-icon.is-open {
+  transform: rotate(180deg);
 }
 
 .close-btn {
-  background: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
   border: none;
-  font-size: 24px;
+  background: none;
+  border-radius: 6px;
+  color: #999;
   cursor: pointer;
+  transition: all 0.2s;
+  padding: 0;
+}
+
+.close-btn:hover {
+  background: #f5f5f5;
   color: #666;
+}
+
+.sessions-dropdown {
+  position: absolute;
+  top: 0px;
+  left: 0px;
+  min-width: 240px;
+  max-width: 320px;
+  background: #fff;
+  border-radius: 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.1);
+  z-index: 100;
+  max-height: 400px;
+  overflow-y: auto;
+  border: 1px solid #f0f0f0;
+  transform-origin: top left;
+  will-change: transform, opacity;
+}
+
+.sessions-list {
+  padding: 8px;
+}
+
+.session-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 12px 16px;
+  border-radius: 8px;
+  margin-bottom: 4px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.session-item:hover {
+  background: #f5f5f5;
+}
+
+.session-item.active {
+  background: #e6f7ff;
+  border-color: #1890ff;
+}
+
+.session-item.default {
+  background: #fafafa;
+}
+
+.session-item.default:hover {
+  background: #f0f7ff;
+}
+
+.session-item.default.active {
+  background: #e6f7ff;
+  border-color: #1890ff;
+}
+
+.session-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: 1;
+}
+
+.default-icon {
+  color: #1890ff;
+  flex-shrink: 0;
+}
+
+.session-title {
+  font-size: 14px;
+  color: #333;
+  font-weight: 500;
+}
+
+.session-time {
+  font-size: 12px;
+  color: #999;
+  margin-left: 8px;
+}
+
+.delete-session-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border: none;
+  background: none;
+  border-radius: 4px;
+  color: #999;
+  cursor: pointer;
+  transition: all 0.2s;
+  opacity: 0;
+  padding: 0;
+}
+
+.session-item:hover .delete-session-btn {
+  opacity: 1;
+}
+
+.delete-session-btn:hover {
+  background: rgba(0, 0, 0, 0.05);
+  color: #ff4d4f;
+}
+
+.session-item.new {
+  color: #1890ff;
+  justify-content: center;
+  margin-top: 8px;
+  border-top: 1px solid #f0f0f0;
+  padding-top: 16px;
+}
+
+.new-session-content {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.add-icon {
+  color: currentColor;
 }
 
 .content {
   flex: 1;
   display: flex;
   flex-direction: column;
-  min-height: 0;
-  position: relative;
   overflow: hidden;
-}
-
-.sessions {
-  position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.1);
-  z-index: 10;
-  max-height: 300px;
-  overflow-y: auto;
-}
-
-.session-list {
-  padding: 8px;
-}
-
-.session-item {
-  padding: 12px;
-  border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s;
-  margin-bottom: 8px;
-  background: #f5f5f5;
   position: relative;
 }
 
-.session-item:hover {
-  background: #e6f7ff;
-}
-
-.session-item.active {
-  background: #1890ff;
-  color: white;
-}
-
-.session-item.new {
-  background: #f0f0f0;
-  text-align: center;
-  color: #666;
-}
-
-.session-name-input {
-  width: 100%;
-  padding: 4px 8px;
-  border: 1px solid #ddd;
-  border-radius: 4px;
-  font-size: 14px;
-  outline: none;
-}
-
-.session-name-input:focus {
-  border-color: #1890ff;
-}
-
-.session-title {
-  font-size: 14px;
-  margin-bottom: 4px;
-}
-
-.session-time {
-  font-size: 12px;
-  color: #999;
-}
-
-.session-context {
-  margin-top: 8px;
-  font-size: 12px;
-  color: #666;
-  border-top: 1px solid #eee;
-  padding-top: 8px;
-}
-
-.context-item {
+.main-content {
+  flex: 1;
   display: flex;
-  gap: 4px;
-  margin-bottom: 4px;
-}
-
-.context-role {
-  flex-shrink: 0;
-  color: #1890ff;
-}
-
-.context-content {
+  flex-direction: column;
+  padding: 16px;
+  gap: 16px;
   overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+}
+
+.input-section {
+  flex-shrink: 0;
 }
 
 .input-area {
-  flex-shrink: 0;
-  margin-bottom: 16px;
+  margin-bottom: 12px;
 }
 
 textarea {
   width: 100%;
-  padding: 12px;
-  border: 1px solid #ddd;
-  border-radius: 6px;
-  resize: none;
+  padding: 12px 16px;
+  border: 1px solid #d9d9d9;
+  border-radius: 8px;
   font-size: 14px;
-  line-height: 1.5;
-  height: 100px;
-  background: #f9f9f9;
-  box-sizing: border-box;
+  line-height: 1.6;
+  resize: none;
+  transition: all 0.2s;
+  background: #fff;
 }
 
 textarea:focus {
-  outline: none;
   border-color: #1890ff;
-  background: white;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
 }
 
-.reply-options {
-  flex-shrink: 0;
-  margin-bottom: 16px;
-}
-
-.role-buttons {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  margin-bottom: 12px;
-}
-
-.role-row {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-}
-
-.role-row button {
-  flex: 1;
-  padding: 8px 12px;
-  border: 1px solid #ddd;
-  border-radius: 20px;
-  background: white;
-  cursor: pointer;
-  transition: all 0.2s;
-  white-space: nowrap;
-  min-width: 80px;
-  max-width: 120px;
-  font-size: 13px;
-}
-
-.role-row button.active {
-  background: #1890ff;
-  color: white;
-  border-color: #1890ff;
-}
-
-.role-row button:hover {
-  background: #e6f7ff;
-  border-color: #1890ff;
-  color: #1890ff;
-}
-
-.role-row button.active:hover {
-  background: #40a9ff;
-  color: white;
-}
-
-.input-actions {
+.control-panel {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 0 8px;
+  gap: 16px;
+}
+
+.left-controls {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 1;
+}
+
+.persona-select {
+  padding: 8px 12px;
+  border: 1px solid #d9d9d9;
+  border-radius: 6px;
+  font-size: 14px;
+  color: #333;
+  background: #fff;
+  cursor: pointer;
+  outline: none;
+  transition: all 0.2s;
+  min-width: 160px;
+}
+
+.persona-select:hover {
+  border-color: #40a9ff;
+}
+
+.persona-select:focus {
+  border-color: #1890ff;
+  box-shadow: 0 0 0 2px rgba(24, 144, 255, 0.1);
 }
 
 .tip {
@@ -809,11 +862,12 @@ textarea:focus {
 }
 
 .generate-btn {
-  padding: 6px 16px;
+  padding: 8px 24px;
   border: none;
-  border-radius: 4px;
+  border-radius: 6px;
   background: #1890ff;
   color: white;
+  font-size: 14px;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -827,179 +881,83 @@ textarea:focus {
   cursor: not-allowed;
 }
 
-.loading {
+.reply-section {
   flex: 1;
+  overflow: hidden;
   display: flex;
   flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  color: #666;
 }
 
-.loading-spinner {
-  width: 24px;
-  height: 24px;
-  border: 2px solid #f3f3f3;
-  border-top: 2px solid #1890ff;
-  border-radius: 50%;
-  animation: spin 1s linear infinite;
-  margin-bottom: 12px;
-}
-
-.loading-text {
-  font-size: 14px;
-  color: #666;
-}
-
-@keyframes spin {
-  0% { transform: rotate(0deg); }
-  100% { transform: rotate(360deg); }
-}
-
-.error {
-  margin: 16px 0;
-  padding: 12px 16px;
-  background: #fff2f0;
-  border: 1px solid #ffccc7;
-  border-radius: 6px;
-  color: #ff4d4f;
-  font-size: 14px;
-  line-height: 1.5;
-}
-
-.replies {
-  flex: 1;
-  overflow-y: auto;
-  overflow-x: hidden;
-  display: flex;
-  flex-direction: column;
-  gap: 12px;
-  padding-right: 8px;
-  margin-right: -8px;
-}
-
-.reply-item {
-  position: relative;
-  padding: 16px;
-  background: #f5f5f5;
-  border-radius: 8px;
-  cursor: pointer;
-  transition: all 0.2s;
-  border: 1px solid transparent;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-.reply-item:hover {
-  background: #e6f7ff;
-  border-color: #1890ff;
-}
-
-.reply-item.selected {
-  background: #e6f7ff;
-  border-color: #1890ff;
-}
-
-.reply-number {
-  flex-shrink: 0;
-  width: 24px;
-  height: 24px;
-  border-radius: 12px;
-  background: #1890ff;
-  color: white;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 12px;
-}
-
-.reply-text {
-  flex: 1;
-  font-size: 14px;
-  line-height: 1.6;
-  color: #333;
-  word-break: break-all;
-  overflow-wrap: break-word;
-}
-
-.copy-tip {
-  position: absolute;
-  right: 12px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: rgba(82, 196, 26, 0.1);
-  color: #52c41a;
-  padding: 4px 8px;
-  border-radius: 4px;
-  font-size: 12px;
-  opacity: 0;
-  transition: opacity 0.2s;
-}
-
-.reply-item:hover .copy-tip {
-  opacity: 1;
-}
-
-.reply-item.copied .copy-tip {
-  opacity: 1;
-  background: #52c41a;
-  color: white;
-}
-
-.delete-btn {
-  position: absolute;
-  right: 8px;
-  top: 50%;
-  transform: translateY(-50%);
-  background: none;
-  border: none;
-  color: #999;
-  font-size: 16px;
-  cursor: pointer;
-  padding: 4px 8px;
-  border-radius: 4px;
-  opacity: 0;
-  transition: all 0.2s;
-}
-
-.session-item:hover .delete-btn {
-  opacity: 1;
-}
-
-.delete-btn:hover {
-  background: rgba(0, 0, 0, 0.05);
-  color: #ff4d4f;
-}
-
-.session-item.active .delete-btn {
-  color: white;
-}
-
-.session-item.active .delete-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
-  color: white;
-}
-
-/* 添加新的样式 */
 .models-replies {
   flex: 1;
   overflow-y: auto;
-  padding: 16px;
-  display: flex;
-  flex-direction: column;
-  gap: 16px;
+  padding-right: 8px;
 }
 
 .no-models-tip {
-  text-align: center;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
   padding: 24px;
-  color: #999;
-  font-size: 14px;
-  background: #f5f5f5;
+  background: #fafafa;
   border-radius: 8px;
-  margin: 16px;
+  color: #999;
+}
+
+.warning-icon {
+  color: #faad14;
+}
+
+/* 自定义滚动条样式 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: #f5f5f5;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #d9d9d9;
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #bfbfbf;
+}
+
+/* 下拉面板动画 */
+.animate-dropdown-enter {
+  animation: dropdown-in 0.2s ease-out;
+  transform-origin: top left;
+}
+
+.animate-dropdown-leave {
+  animation: dropdown-out 0.2s ease-in;
+  transform-origin: top left;
+}
+
+@keyframes dropdown-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+@keyframes dropdown-out {
+  from {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+  to {
+    opacity: 0;
+    transform: scale(0.95) translateY(-10px);
+  }
 }
 </style> 
