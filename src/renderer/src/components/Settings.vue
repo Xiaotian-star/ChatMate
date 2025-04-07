@@ -513,7 +513,7 @@ const saveSettings = async () => {
         return acc
       }, {} as Record<string, Prompt>),
       shortcut: settings.value.shortcut,
-      conversations: [],
+      conversations: settings.value.conversations || [], // 确保保存会话数据
       autoGenerate: settings.value.autoGenerate,
       systemPrompt: settings.value.systemPrompt,
       autoLaunch: settings.value.autoLaunch

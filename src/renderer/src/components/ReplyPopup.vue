@@ -178,6 +178,15 @@ async function loadSettings() {
     const savedSettings = await window.electronAPI.getSettings()
     if (savedSettings) {
       settings.value = savedSettings
+      // 加载保存的会话数据
+      if (Array.isArray(savedSettings.conversations)) {
+        sessions.value = savedSettings.conversations
+        console.log('已加载保存的会话:', sessions.value)
+      } else {
+        sessions.value = []
+        console.log('没有找到保存的会话，使用空数组')
+      }
+      
       // 如果当前选中的人设不在设置中，选择第一个可用的人设
       const availablePersonas = Object.values(savedSettings.prompts).map(p => p.title)
       if (!availablePersonas.includes(selectedPersona.value) && availablePersonas.length > 0) {
@@ -186,6 +195,7 @@ async function loadSettings() {
     }
   } catch (err) {
     console.error('加载设置失败:', err)
+    error.value = '加载设置失败'
   }
 }
 
@@ -199,8 +209,19 @@ function createNewSession() {
 }
 
 // 确认创建新会话
-function confirmNewSession() {
-  if (newSessionName.value.trim() && sessions.value.length < 10) {
+async function confirmNewSession() {
+  try {
+    if (!newSessionName.value.trim()) {
+      error.value = '会话名称不能为空'
+      return
+    }
+    
+    if (sessions.value.length >= 10) {
+      error.value = '最多只能创建10个会话'
+      return
+    }
+
+    console.log('开始创建新会话...')
     const sessionId = Date.now().toString(36)
     const newSession = {
       id: sessionId,
@@ -208,23 +229,42 @@ function confirmNewSession() {
       messages: [],
       lastUpdated: Date.now()
     }
+    
+    console.log('新会话数据:', newSession)
     sessions.value.push(newSession)
     currentSessionId.value = sessionId
-    showSessions.value = false
-    isCreatingSession.value = false
     
-    // 保存设置
-    window.electronAPI.getSettings()
-      .then(settings => {
-        return window.electronAPI.saveSettings({
-          ...settings,
-          conversations: sessions.value
-        })
-      })
-      .catch(err => {
-        console.error('保存设置失败:', err)
-        error.value = '创建会话失败'
-      })
+    console.log('正在获取当前设置...')
+    const currentSettings = await window.electronAPI.getSettings()
+    console.log('当前设置:', currentSettings)
+    
+    // 创建一个只包含可序列化数据的设置对象
+    const settingsToSave = {
+      ...currentSettings,
+      conversations: sessions.value
+    }
+    
+    console.log('正在保存更新后的设置...', settingsToSave)
+    const success = await window.electronAPI.saveSettings(settingsToSave)
+    
+    if (success) {
+      console.log('会话创建成功')
+      showSessions.value = false
+      isCreatingSession.value = false
+      error.value = ''
+      newSessionName.value = ''
+    } else {
+      console.error('保存设置返回失败')
+      error.value = '创建会话失败：无法保存设置'
+      // 回滚会话创建
+      sessions.value = sessions.value.filter(s => s.id !== sessionId)
+      currentSessionId.value = 'default'
+    }
+  } catch (err) {
+    console.error('创建会话时出错:', err)
+    error.value = '创建会话失败：' + (err instanceof Error ? err.message : '未知错误')
+    // 确保回滚任何可能的更改
+    await loadSettings()
   }
 }
 
@@ -394,11 +434,22 @@ async function deleteSession(sessionId: string) {
   }
   
   try {
-    const settings = await window.electronAPI.getSettings()
-    await window.electronAPI.saveSettings({
-      ...settings,
-      conversations: sessions.value
-    })
+    const currentSettings = await window.electronAPI.getSettings()
+    // 创建一个只包含可序列化数据的设置对象
+    const settingsToSave = {
+      ...currentSettings,
+      conversations: sessions.value.map(session => ({
+        id: session.id,
+        title: session.title,
+        messages: session.messages.map(msg => ({
+          role: msg.role,
+          content: msg.content
+        })),
+        lastUpdated: session.lastUpdated
+      }))
+    }
+    
+    await window.electronAPI.saveSettings(settingsToSave)
   } catch (err) {
     console.error('删除会话失败:', err)
     error.value = '删除会话失败'
