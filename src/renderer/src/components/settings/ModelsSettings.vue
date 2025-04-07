@@ -18,8 +18,8 @@
             <span class="model-name">{{ model.name }}</span>
             <div class="model-actions">
               <el-switch
-                v-model="model.isActive"
-                @change="toggleModel(model)"
+                :model-value="model.isActive"
+                @update:model-value="(val: boolean) => toggleModel(model, val)"
                 :title="model.isActive ? '已启用' : '已禁用'"
               />
               <el-button-group>
@@ -150,6 +150,11 @@ const modelsList = computed<Model[]>(() => {
   return Object.values(props.settings.models)
 })
 
+// 计算当前启用的模型数量
+const activeModelsCount = computed(() => {
+  return modelsList.value.filter(model => model.isActive).length
+})
+
 // 表单相关
 const dialogVisible = ref(false)
 const isEditing = ref(false)
@@ -231,12 +236,18 @@ const deleteModel = async (model: Model) => {
 }
 
 // 切换模型状态
-const toggleModel = (model: Model) => {
+const toggleModel = async (model: Model, newValue: boolean) => {
+  // 如果要关闭模型,且当前只有一个模型启用,阻止操作
+  if (!newValue && activeModelsCount.value <= 1) {
+    ElMessage.warning('至少需要保持一个模型处于启用状态')
+    return
+  }
+  
   const newModels = {
     ...props.settings.models,
     [model.id]: {
       ...model,
-      isActive: !model.isActive
+      isActive: newValue
     }
   }
   
