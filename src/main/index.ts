@@ -7,9 +7,13 @@ import { getAIResponse } from './ai'
 import { getSettings, saveSettings, exportSettings, importSettings } from './settings'
 import { checkForUpdates } from './update'
 
+// 获取 preload 脚本的路径
+const preload = join(__dirname, '../preload/index.js')
+
 let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let popupWindow: BrowserWindow | null = null
+let settingsWindow: BrowserWindow | null = null
 
 // 判断是否为开发环境
 const isDevelopment = process.env.NODE_ENV === 'development'
@@ -17,6 +21,19 @@ const isDevelopment = process.env.NODE_ENV === 'development'
 // 保存当前注册的快捷键
 let currentMainShortcut: string | null = null
 let currentAutoGenerateShortcut: string | null = null
+
+// 显示设置窗口
+function showSettingsWindow() {
+  if (!settingsWindow || settingsWindow.isDestroyed()) {
+    createSettingsWindow()
+  } else {
+    if (settingsWindow.isMinimized()) {
+      settingsWindow.restore()
+    }
+    settingsWindow.show()
+    settingsWindow.focus()
+  }
+}
 
 // 创建托盘
 function createTray() {
@@ -33,7 +50,7 @@ function createTray() {
     {
       label: '打开设置',
       click: () => {
-        showMainWindow()
+        showSettingsWindow()
       }
     },
     {
@@ -74,7 +91,7 @@ function createTray() {
   if (process.platform === 'darwin') {
     // macOS: 左键点击显示设置窗口
     tray.on('click', () => {
-      showMainWindow()
+      showSettingsWindow()
     })
     
     // 右键点击显示菜单
@@ -84,26 +101,11 @@ function createTray() {
   } else {
     // Windows: 左键点击显示设置窗口，右键显示菜单
     tray.on('click', () => {
-      showMainWindow()
+      showSettingsWindow()
     })
     
     // 设置右键菜单
     tray.setContextMenu(contextMenu)
-  }
-}
-
-// 显示主窗口
-function showMainWindow() {
-  if (!mainWindow || mainWindow.isDestroyed()) {
-    createWindow()
-  }
-  
-  if (mainWindow) {
-    if (mainWindow.isMinimized()) {
-      mainWindow.restore()
-    }
-    mainWindow.show()
-    mainWindow.focus()
   }
 }
 
@@ -286,72 +288,7 @@ function createPopupWindow(): void {
 
 // 创建主窗口
 function createWindow(): void {
-  // 创建浏览器窗口
-  mainWindow = new BrowserWindow({
-    width: 900,
-    height: 670,
-    show: false,
-    frame: false, // 无边框
-    transparent: true, // 透明背景
-    autoHideMenuBar: true,
-    ...(process.platform === 'linux' ? { icon } : {}),
-    webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
-      sandbox: false,
-      devTools: true // 确保开发者工具可用
-    }
-  })
-
-  mainWindow.on('ready-to-show', () => {
-    // mainWindow.show() // 注释掉这行，使窗口默认不显示
-    // 根据环境决定是否打开开发者工具
-    if (isDevelopment && mainWindow) {
-      mainWindow.webContents.openDevTools()
-      // 注册开发者工具快捷键
-      globalShortcut.register('CommandOrControl+Shift+I', () => {
-        if (mainWindow && !mainWindow.isDestroyed()) {
-          mainWindow.webContents.toggleDevTools()
-        }
-      })
-    }
-  })
-
-  mainWindow.webContents.setWindowOpenHandler((details) => {
-    shell.openExternal(details.url)
-    return { action: 'deny' }
-  })
-
-  // 添加窗口控制事件处理
-  ipcMain.on('window-min', () => {
-    mainWindow?.minimize()
-  })
-
-  ipcMain.on('window-max', () => {
-    if (mainWindow?.isMaximized()) {
-      mainWindow?.restore()
-    } else {
-      mainWindow?.maximize()
-    }
-  })
-
-  ipcMain.on('window-close', () => {
-    mainWindow?.hide() // 点击关闭时隐藏窗口而不是退出应用
-  })
-
-  // HMR for renderer base on electron-vite cli.
-  // Load the remote URL for development or the local html file for production.
-  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
-    mainWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
-  } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
-  }
-
-  // 注册 IPC 事件处理
-  ipcMain.handle('toggle-devtools', () => {
-    if (mainWindow && !mainWindow.isDestroyed()) {
-      mainWindow.webContents.toggleDevTools()
-    }
-  })
+  // 不再需要创建主窗口
 }
 
 // 应用初始化
@@ -363,9 +300,6 @@ app.whenReady().then(async () => {
   globalShortcut.unregisterAll()
   currentMainShortcut = null
   currentAutoGenerateShortcut = null
-
-  // 默认创建窗口但不显示
-  createWindow()
   
   // 创建托盘
   createTray()
@@ -384,14 +318,14 @@ app.whenReady().then(async () => {
     }
   })
   
-  // 隐藏 dock 栏图标 (仅 macOS)
+  // 在应用启动时隐藏 dock 图标
   if (process.platform === 'darwin') {
     app.dock.hide()
   }
 
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
-      createWindow()
+      showSettingsWindow()
     }
   })
 })
@@ -628,3 +562,67 @@ ipcMain.handle('check-shortcut-available', async (_event, shortcut: string) => {
 ipcMain.on('clear-clipboard', () => {
   clipboard.writeText('')
 })
+
+function createSettingsWindow() {
+  // 创建设置窗口
+  settingsWindow = new BrowserWindow({
+    width: 900,
+    height: 680,
+    show: false,
+    frame: false,
+    resizable: true,
+    webPreferences: {
+      preload,
+      sandbox: false,
+      nodeIntegration: true,
+      contextIsolation: true,
+      devTools: true // 添加开发者工具支持
+    }
+  })
+
+  // 在 macOS 上，显示窗口时显示 dock 图标
+  if (process.platform === 'darwin') {
+    app.dock.show()
+  }
+
+  settingsWindow.on('ready-to-show', () => {
+    settingsWindow?.show()
+    // 在开发环境下自动打开开发者工具
+    if (isDevelopment) {
+      settingsWindow?.webContents.openDevTools()
+    }
+  })
+
+  // 监听窗口关闭事件
+  settingsWindow.on('closed', () => {
+    settingsWindow = null
+    // 在 macOS 上，关闭窗口时隐藏 dock 图标
+    if (process.platform === 'darwin') {
+      app.dock.hide()
+    }
+  })
+
+  // 添加窗口控制事件处理
+  ipcMain.on('window-min', () => {
+    settingsWindow?.minimize()
+  })
+
+  ipcMain.on('window-max', () => {
+    if (settingsWindow?.isMaximized()) {
+      settingsWindow?.restore()
+    } else {
+      settingsWindow?.maximize()
+    }
+  })
+
+  ipcMain.on('window-close', () => {
+    settingsWindow?.close()
+  })
+
+  // 加载页面
+  if (is.dev && process.env['ELECTRON_RENDERER_URL']) {
+    settingsWindow.loadURL(process.env['ELECTRON_RENDERER_URL'])
+  } else {
+    settingsWindow.loadFile(join(__dirname, '../renderer/index.html'))
+  }
+}

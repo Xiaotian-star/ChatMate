@@ -5,6 +5,10 @@ import ReplyPopup from '../components/ReplyPopup.vue'
 const routes = [
   {
     path: '/',
+    redirect: '/settings'
+  },
+  {
+    path: '/settings',
     name: 'Settings',
     component: Settings
   },

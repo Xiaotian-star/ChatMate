@@ -237,7 +237,7 @@
           </div>
 
           <!-- 保存按钮 -->
-          <div class="settings-footer">
+          <div class="settings-footer" v-if="activeMenu !== 'about'">
             <el-button type="primary" @click="saveSettings" size="large">
               <el-icon><Check /></el-icon>
               保存设置
@@ -501,26 +501,40 @@ const loadSettings = async () => {
 // 保存设置
 const saveSettings = async () => {
   try {
-    // 创建一个只包含需要保存的数据的对象
+    // 创建一个新的对象，只包含需要保存的基本数据
     const settingsToSave = {
-      apiKey: settings.value.apiKey,
-      prompts: Object.entries(settings.value.prompts).reduce((acc, [key, prompt]) => {
+      apiKey: settings.value.apiKey || '',
+      shortcut: settings.value.shortcut || '',
+      autoGenerate: !!settings.value.autoGenerate,
+      systemPrompt: settings.value.systemPrompt || '',
+      autoLaunch: !!settings.value.autoLaunch,
+      // 确保 prompts 只包含必要的字段
+      prompts: Object.entries(settings.value.prompts || {}).reduce((acc, [key, prompt]) => {
         acc[key] = {
-          title: prompt.title,
-          content: prompt.content,
-          isDefault: prompt.isDefault
+          title: String(prompt.title || ''),
+          content: String(prompt.content || ''),
+          isDefault: !!prompt.isDefault
         }
         return acc
-      }, {} as Record<string, Prompt>),
-      shortcut: settings.value.shortcut,
-      conversations: settings.value.conversations || [], // 确保保存会话数据
-      autoGenerate: settings.value.autoGenerate,
-      systemPrompt: settings.value.systemPrompt,
-      autoLaunch: settings.value.autoLaunch
+      }, {} as Record<string, { title: string; content: string; isDefault: boolean }>),
+      // 确保 conversations 是一个简单的数组，只包含基本数据
+      conversations: (settings.value.conversations || []).map(conv => ({
+        id: String(conv.id || ''),
+        title: String(conv.title || ''),
+        messages: (conv.messages || []).map(msg => ({
+          role: String(msg.role || ''),
+          content: String(msg.content || '')
+        })),
+        lastUpdated: Number(conv.lastUpdated || Date.now())
+      }))
     }
 
-    console.log('正在保存设置:', JSON.stringify(settingsToSave))
-    const success = await window.electronAPI.saveSettings(settingsToSave)
+    // 先尝试序列化，确保数据可以被正确转换
+    const serializedData = JSON.stringify(settingsToSave)
+    const parsedData = JSON.parse(serializedData)
+
+    console.log('正在保存设置:', serializedData)
+    const success = await window.electronAPI.saveSettings(parsedData)
     if (success) {
       ElMessage.success('设置保存成功')
     } else {
