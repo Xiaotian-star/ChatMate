@@ -13,19 +13,7 @@ declare global {
       }
       ipcRenderer: typeof ipcRenderer
     }
-    electronAPI: {
-      getAIResponse: (params: AIRequestParams) => Promise<string[]>
-      getSettings: () => Promise<StoredSettings>
-      saveSettings: (settings: StoredSettings) => Promise<boolean>
-      onTextSelected: (callback: (text: string) => void) => () => void
-      onAutoGenerate: (callback: () => void) => () => void
-      closePopup: () => void
-      moveWindow: (deltaX: number, deltaY: number) => void
-      checkForUpdates: () => Promise<UpdateInfo>
-      windowMin: () => void
-      windowMax: () => void
-      windowClose: () => void
-    }
+    electronAPI: ElectronAPI
   }
 }
 
