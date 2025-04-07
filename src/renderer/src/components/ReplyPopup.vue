@@ -797,10 +797,15 @@ function handleKeyDown(e: KeyboardEvent) {
 
 .input-section {
   flex-shrink: 0;
+  min-height: 160px;
+  display: flex;
+  flex-direction: column;
 }
 
 .input-area {
   margin-bottom: 12px;
+  flex: 1;
+  display: flex;
 }
 
 textarea {
@@ -813,6 +818,8 @@ textarea {
   resize: none;
   transition: all 0.2s;
   background: #fff;
+  min-height: 100px;
+  flex: 1;
 }
 
 textarea:focus {

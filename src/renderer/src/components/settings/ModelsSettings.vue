@@ -66,13 +66,11 @@
         :rules="modelRules"
         label-width="100px"
       >
+        <el-form-item label="模型名称" prop="name">
+          <el-input v-model="modelForm.name" placeholder="请输入模型名称" />
+        </el-form-item>
         <el-form-item label="模型类型" prop="type">
-          <el-select 
-            v-model="modelForm.type" 
-            placeholder="请选择模型类型" 
-            style="width: 100%"
-            @change="handleModelTypeChange"
-          >
+          <el-select v-model="modelForm.type" placeholder="请选择模型类型" style="width: 100%">
             <el-option label="Deepseek" value="deepseek-chat" />
             <el-option label="GPT-3.5" value="gpt-3.5-turbo" />
             <el-option label="GPT-4" value="gpt-4" />
@@ -171,27 +169,18 @@ const modelForm = ref<Model>({
   isActive: true
 })
 
-// 模型类型到显示名称的映射
-const MODEL_TYPE_NAMES: Record<string, string> = {
-  'deepseek-chat': 'Deepseek',
-  'gpt-3.5-turbo': 'GPT-3.5',
-  'gpt-4': 'GPT-4',
-  'claude': 'Claude'
-}
-
 // 表单验证规则
 const modelRules: FormRules = {
+  name: [
+    { required: true, message: '请输入模型名称', trigger: 'blur' },
+    { min: 2, max: 20, message: '长度在 2 到 20 个字符', trigger: 'blur' }
+  ],
   type: [
     { required: true, message: '请选择模型类型', trigger: 'change' }
   ],
   apiKey: [
     { required: true, message: '请输入 API Key', trigger: 'blur' }
   ]
-}
-
-// 处理模型类型变更
-const handleModelTypeChange = (type: string) => {
-  modelForm.value.name = MODEL_TYPE_NAMES[type] || type
 }
 
 // 显示添加模型对话框
@@ -206,8 +195,6 @@ const showAddModelDialog = () => {
     proxy: '',
     isActive: true
   }
-  // 设置初始名称
-  handleModelTypeChange(modelForm.value.type)
   dialogVisible.value = true
 }
 

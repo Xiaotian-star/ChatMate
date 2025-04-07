@@ -4,7 +4,7 @@
     <div class="model-header" @click="toggleCollapse">
       <div class="model-info">
         <span class="model-name">{{ model.name }}</span>
-        <span class="model-type">{{ model.type }}</span>
+        <!-- <span class="model-type">{{ model.type }}</span> -->
       </div>
       <div class="header-right">
         <div v-if="loading" class="loading-indicator">
@@ -85,6 +85,10 @@ async function getReply() {
   
   try {
     const modelSpecificConfig = getModelSpecificConfig(props.model.type)
+    // 获取全局设置
+    const globalSettings = await window.electronAPI.getSettings()
+    const systemPrompt = globalSettings?.systemPrompt || ''
+    
     const requestParams = {
       text: props.text,
       persona: props.persona,
@@ -95,7 +99,12 @@ async function getReply() {
         baseUrl: props.model.baseUrl || getDefaultBaseUrl(props.model.type),
         proxy: props.model.proxy,
         ...modelSpecificConfig,
-        systemPrompt: `${modelSpecificConfig.systemPrompt}\n\n${props.persona}`
+        // 组合系统提示词: 全局系统提示词 + 模型特定提示词 + 人设提示词
+        systemPrompt: [
+          systemPrompt,
+          modelSpecificConfig.systemPrompt,
+          props.persona
+        ].filter(Boolean).join('\n\n')
       }
     }
     
