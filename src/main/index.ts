@@ -14,6 +14,10 @@ let popupWindow: BrowserWindow | null = null
 // 判断是否为开发环境
 const isDevelopment = process.env.NODE_ENV === 'development'
 
+// 保存当前注册的快捷键
+let currentMainShortcut: string | null = null
+let currentAutoGenerateShortcut: string | null = null
+
 // 创建托盘
 function createTray() {
   // 创建托盘图标
@@ -132,8 +136,15 @@ const registerShortcuts = async () => {
     globalShortcut.unregisterAll()
     let mainShortcutRegistered = false
     let autoGenerateShortcutRegistered = false
+
     // 注册主快捷键
     if (settings.shortcut) {
+      // 如果快捷键发生变化，注销旧的快捷键
+      if (currentMainShortcut && currentMainShortcut !== settings.shortcut) {
+        globalShortcut.unregister(currentMainShortcut)
+        console.log('注销旧的主快捷键:', currentMainShortcut)
+      }
+
       // 检查快捷键是否被系统占用
       if (isShortcutRegistered(settings.shortcut)) {
         console.error('快捷键已被系统占用:', settings.shortcut)
@@ -159,51 +170,35 @@ const registerShortcuts = async () => {
           console.error('快捷键注册失败:', settings.shortcut)
         } else {
           mainShortcutRegistered = true
+          currentMainShortcut = settings.shortcut
           console.log('主快捷键注册成功:', settings.shortcut)
         }
       }
-    }
-
-    // 注册自动生成快捷键
-    if (settings.autoGenerateShortcut) {
-      // 检查快捷键是否被系统占用
-      if (isShortcutRegistered(settings.autoGenerateShortcut)) {
-        console.error('自动生成快捷键已被系统占用:', settings.autoGenerateShortcut)
-      } else {
-        const registered = globalShortcut.register(settings.autoGenerateShortcut, () => {
-          // 如果窗口不存在或已被销毁，先创建窗口
-          if (!popupWindow || popupWindow.isDestroyed()) {
-            createPopupWindow()
-          } else {
-            popupWindow.show()
-            popupWindow.webContents.send('auto-generate')
-          }
-        })
-
-        if (!registered) {
-          console.error('自动生成快捷键注册失败:', settings.autoGenerateShortcut)
-        } else {
-          autoGenerateShortcutRegistered = true
-          console.log('自动生成快捷键注册成功:', settings.autoGenerateShortcut)
-        }
+    } else {
+      // 如果没有设置主快捷键，注销之前的快捷键
+      if (currentMainShortcut) {
+        globalShortcut.unregister(currentMainShortcut)
+        currentMainShortcut = null
+        console.log('注销旧的主快捷键，因为没有新的快捷键设置')
       }
     }
+
+    
 
     // 如果两个快捷键都注册失败，返回 false
     if (settings.shortcut && !mainShortcutRegistered) {
       console.error('主快捷键注册失败')
       return false
     }
-    if (settings.autoGenerateShortcut && !autoGenerateShortcutRegistered) {
-      console.error('自动生成快捷键注册失败')
-      return false
-    }
+  
 
     return true
   } catch (error) {
     console.error('注册快捷键失败:', error)
     // 发生错误时注销所有快捷键
     globalShortcut.unregisterAll()
+    currentMainShortcut = null
+    currentAutoGenerateShortcut = null
     return false
   }
 }
@@ -345,6 +340,8 @@ app.whenReady().then(async () => {
 
   // 确保清理所有已注册的快捷键
   globalShortcut.unregisterAll()
+  currentMainShortcut = null
+  currentAutoGenerateShortcut = null
 
   // 默认创建窗口但不显示
   createWindow()
@@ -449,8 +446,16 @@ ipcMain.handle('get-settings', () => {
 // 保存设置
 ipcMain.handle('save-settings', async (_, settings: StoredSettings) => {
   try {
+    // 保存当前快捷键状态
+    const oldMainShortcut = currentMainShortcut
+    const oldAutoGenerateShortcut = currentAutoGenerateShortcut
+    
     // 注销所有现有快捷键
     globalShortcut.unregisterAll()
+    
+    // 清除当前快捷键记录
+    currentMainShortcut = null
+    currentAutoGenerateShortcut = null
     
     // 保存设置
     await saveSettings(settings)
@@ -458,14 +463,43 @@ ipcMain.handle('save-settings', async (_, settings: StoredSettings) => {
     // 重新注册快捷键
     const registered = await registerShortcuts()
     if (!registered) {
+      // 如果注册失败，尝试恢复旧的快捷键
+      if (oldMainShortcut) {
+        globalShortcut.register(oldMainShortcut, () => {
+          if (!popupWindow || popupWindow.isDestroyed()) {
+            createPopupWindow()
+          } else {
+            const clipboardText = clipboard.readText()
+            popupWindow.show()
+            if (clipboardText) {
+              popupWindow.webContents.send('selected-text', clipboardText)
+              if (settings.autoGenerate) {
+                popupWindow.webContents.send('auto-generate')
+              }
+            }
+          }
+        })
+        currentMainShortcut = oldMainShortcut
+      }
+      
+      if (oldAutoGenerateShortcut) {
+        globalShortcut.register(oldAutoGenerateShortcut, () => {
+          if (!popupWindow || popupWindow.isDestroyed()) {
+            createPopupWindow()
+          } else {
+            popupWindow.show()
+            popupWindow.webContents.send('auto-generate')
+          }
+        })
+        currentAutoGenerateShortcut = oldAutoGenerateShortcut
+      }
+      
       throw new Error('快捷键注册失败')
     }
     
     return true
   } catch (error) {
     console.error('保存设置失败:', error)
-    // 如果保存失败，尝试重新注册原有快捷键
-    await registerShortcuts()
     return false
   }
 })
@@ -556,6 +590,13 @@ ipcMain.on('resize-window', (_, { deltaX, deltaY }) => {
 })
 
 // 检查快捷键是否可用
-ipcMain.handle('check-shortcut-available', (_, shortcut: string) => {
-  return !isShortcutRegistered(shortcut)
+ipcMain.handle('check-shortcut-available', async (_event, shortcut: string) => {
+  try {
+    // 检查是否已经注册了这个快捷键
+    const isRegistered = globalShortcut.isRegistered(shortcut)
+    return !isRegistered
+  } catch (error) {
+    console.error('检查快捷键时出错:', error)
+    return false
+  }
 })

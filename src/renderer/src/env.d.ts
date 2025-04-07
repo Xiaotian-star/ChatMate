@@ -1,5 +1,7 @@
 /// <reference types="vite/client" />
 
+import type { ElectronAPI } from '../../types'
+
 declare module '*.vue' {
   import type { DefineComponent } from 'vue'
   // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/ban-types
@@ -7,20 +9,23 @@ declare module '*.vue' {
   export default component
 }
 
-import type { ElectronAPI } from '../../types'
-
 interface Settings {
   apiKey?: string
   prompts?: Record<string, string>
 }
 
-interface Window {
-  electronAPI: ElectronAPI
-  electron: {
-    process: {
-      versions: {
-        app: string
+declare global {
+  interface Window {
+    electron: {
+      process: {
+        versions: {
+          app: string
+        }
       }
+      ipcRenderer: Electron.IpcRenderer
     }
+    electronAPI: ElectronAPI
   }
 }
+
+export {}

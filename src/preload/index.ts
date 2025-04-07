@@ -40,7 +40,7 @@ const api: ElectronAPI = {
   
   // 自动启动相关
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
-  setAutoLaunch: (enable: boolean) => ipcRenderer.invoke('set-auto-launch', enable),
+  setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke('set-auto-launch', enabled),
   
   // 窗口控制
   windowMin: () => ipcRenderer.send('window-min'),

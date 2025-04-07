@@ -25,7 +25,6 @@ export interface StoredSettings {
   shortcut: string
   conversations: Conversation[]
   autoGenerate: boolean
-  autoGenerateShortcut: string
   systemPrompt: string
   autoLaunch?: boolean
 }
@@ -47,7 +46,7 @@ export interface ElectronAPI {
   
   // 自动启动相关
   getAutoLaunch: () => Promise<boolean>
-  setAutoLaunch: (enable: boolean) => Promise<boolean>
+  setAutoLaunch: (enabled: boolean) => Promise<boolean>
   
   // 窗口控制
   windowMin: () => void
@@ -58,7 +57,7 @@ export interface ElectronAPI {
   toggleDevTools: () => Promise<void>
   
   // 更新相关
-  checkForUpdates: () => Promise<{ hasUpdate: boolean; version: string; releaseNotes?: string }>
+  checkForUpdates: () => Promise<{ hasUpdate: boolean; latestVersion: string; releaseNotes?: string }>
   
   // 快捷键检查
   checkShortcutAvailable: (shortcut: string) => Promise<boolean>
