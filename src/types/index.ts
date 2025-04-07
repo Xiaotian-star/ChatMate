@@ -47,7 +47,7 @@ export interface ElectronAPI {
   
   // 自动启动相关
   getAutoLaunch: () => Promise<boolean>
-  setAutoLaunch: (value: boolean) => Promise<boolean>
+  setAutoLaunch: (enable: boolean) => Promise<boolean>
   
   // 窗口控制
   windowMin: () => void
@@ -57,17 +57,23 @@ export interface ElectronAPI {
   // 开发者工具
   toggleDevTools: () => Promise<void>
   
+  // 更新相关
+  checkForUpdates: () => Promise<{ hasUpdate: boolean; version: string; releaseNotes?: string }>
+  
+  // 快捷键检查
+  checkShortcutAvailable: (shortcut: string) => Promise<boolean>
+  
   // 其他功能
   onTextSelected: (callback: (text: string) => void) => () => void
   onAutoGenerate: (callback: () => void) => () => void
-  
-  // 其他功能
   closePopup: () => void
   moveWindow: (deltaX: number, deltaY: number) => void
-  checkForUpdates: () => Promise<{
-    hasUpdate: boolean
-    latestVersion: string
-  }>
+  
+  // 导出设置
+  exportSettings: () => Promise<{ success: boolean; message: string }>
+  
+  // 导入设置
+  importSettings: (mode: 'merge' | 'replace') => Promise<{ success: boolean; message: string }>
 }
 
 // 更新信息类型

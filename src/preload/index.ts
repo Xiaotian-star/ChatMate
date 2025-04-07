@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { AIRequestParams, StoredSettings, UpdateInfo } from '../types'
+import type { AIRequestParams, StoredSettings, UpdateInfo, ElectronAPI } from '../types'
 import { electronAPI } from '@electron-toolkit/preload'
 
 // 扩展 Window 接口
@@ -30,7 +30,7 @@ declare global {
 }
 
 // 导出自定义 API
-const api = {
+const api: ElectronAPI = {
   // AI 响应相关
   getAIResponse: (params: AIRequestParams) => ipcRenderer.invoke('get-ai-response', params),
   
@@ -53,23 +53,31 @@ const api = {
   // 更新相关
   checkForUpdates: () => ipcRenderer.invoke('check-for-updates'),
   
+  // 快捷键检查
+  checkShortcutAvailable: (shortcut: string) => ipcRenderer.invoke('check-shortcut-available', shortcut),
+  
   // 其他功能
   onTextSelected: (callback: (text: string) => void) => {
-    ipcRenderer.on('text-selected', (_, text) => callback(text))
-    return () => ipcRenderer.removeListener('text-selected', callback)
+    const handler = (_: Electron.IpcRendererEvent, text: string) => callback(text)
+    ipcRenderer.on('text-selected', handler)
+    return () => ipcRenderer.removeListener('text-selected', handler)
   },
   onAutoGenerate: (callback: () => void) => {
-    ipcRenderer.on('auto-generate', callback)
-    return () => ipcRenderer.removeListener('auto-generate', callback)
+    const handler = (_: Electron.IpcRendererEvent) => callback()
+    ipcRenderer.on('auto-generate', handler)
+    return () => ipcRenderer.removeListener('auto-generate', handler)
   },
   closePopup: () => ipcRenderer.send('close-popup'),
   moveWindow: (deltaX: number, deltaY: number) => {
-    // 获取当前窗口大小
-    const currentWindow = require('@electron/remote').getCurrentWindow()
-    const [width, height] = currentWindow.getSize()
     // 发送调整大小的消息
-    ipcRenderer.send('resize-window', { width, height })
-  }
+    ipcRenderer.send('resize-window', { deltaX, deltaY })
+  },
+  
+  // 导出设置
+  exportSettings: () => ipcRenderer.invoke('export-settings'),
+  
+  // 导入设置
+  importSettings: (mode: 'merge' | 'replace') => ipcRenderer.invoke('import-settings', mode)
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -1,6 +1,6 @@
-import { app } from 'electron'
+import { app, dialog } from 'electron'
 import { join } from 'path'
-import { writeFileSync, existsSync, mkdirSync } from 'fs'
+import { writeFileSync, readFileSync, existsSync, mkdirSync, accessSync, constants } from 'fs'
 import type { StoredSettings } from '../types'
 
 // 创建一个用于记录错误的简单日志函数
@@ -100,4 +100,88 @@ export async function saveSettings(settings: StoredSettings): Promise<boolean> {
     logError(error, 'Failed to save settings')
     return false
   }
+}
+
+// 导出设置到文件
+export async function exportSettings(): Promise<{ success: boolean; message: string }> {
+  try {
+    // 获取当前设置
+    const settings = getSettings()
+    
+    // 打开保存对话框
+    const { filePath } = await dialog.showSaveDialog({
+      title: '导出设置',
+      defaultPath: join(app.getPath('downloads'), 'chatmate-settings.json'),
+      filters: [{ name: 'JSON', extensions: ['json'] }]
+    })
+
+    if (!filePath) {
+      return { success: false, message: '未选择保存位置' }
+    }
+
+    // 导出设置
+    writeFileSync(filePath, JSON.stringify(settings, null, 2), 'utf-8')
+    return { success: true, message: '设置导出成功' }
+  } catch (error) {
+    console.error('导出设置失败:', error)
+    return { success: false, message: `导出失败: ${error.message}` }
+  }
+}
+
+// 从文件导入设置
+export async function importSettings(mode: 'merge' | 'replace' = 'merge'): Promise<{ success: boolean; message: string }> {
+  try {
+    // 打开文件选择对话框
+    const { filePaths } = await dialog.showOpenDialog({
+      title: '导入设置',
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+      properties: ['openFile']
+    })
+
+    if (filePaths.length === 0) {
+      return { success: false, message: '未选择文件' }
+    }
+
+    // 读取并解析文件
+    const fileContent = readFileSync(filePaths[0], 'utf-8')
+    const importedSettings = JSON.parse(fileContent) as StoredSettings
+
+    // 验证设置格式
+    if (!validateSettings(importedSettings)) {
+      return { success: false, message: '无效的设置文件格式' }
+    }
+
+    // 根据模式处理设置
+    if (mode === 'merge') {
+      const currentSettings = getSettings()
+      const mergedSettings = {
+        ...currentSettings,
+        ...importedSettings,
+        prompts: [...currentSettings.prompts, ...importedSettings.prompts]
+      }
+      saveSettings(mergedSettings)
+    } else {
+      saveSettings(importedSettings)
+    }
+
+    return { success: true, message: '设置导入成功' }
+  } catch (error) {
+    console.error('导入设置失败:', error)
+    return { success: false, message: `导入失败: ${error.message}` }
+  }
+}
+
+// 验证设置格式
+function validateSettings(settings: any): settings is StoredSettings {
+  return (
+    typeof settings === 'object' &&
+    settings !== null &&
+    Array.isArray(settings.prompts) &&
+    settings.prompts.every(
+      (prompt: any) =>
+        typeof prompt === 'object' &&
+        typeof prompt.title === 'string' &&
+        typeof prompt.content === 'string'
+    )
+  )
 } 
