@@ -32,6 +32,12 @@
             v-model:settings="settings"
           />
 
+          <!-- 模型管理 -->
+          <ModelsSettings
+            v-if="activeMenu === 'models'"
+            v-model:settings="settings"
+          />
+
           <!-- 高级设置 -->
           <AdvancedSettings
             v-if="activeMenu === 'advanced'"
@@ -60,7 +66,7 @@
 import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Check } from '@element-plus/icons-vue'
-import type { StoredSettings, Prompt, Conversation, Message } from '../../../types'
+import type { StoredSettings, Prompt, Conversation, Message, Model } from '../../../types'
 
 // 导入子组件
 import TitleBar from './settings/TitleBar.vue'
@@ -68,19 +74,32 @@ import Sidebar from './settings/Sidebar.vue'
 import GeneralSettings from './settings/GeneralSettings.vue'
 import PromptsSettings from './settings/PromptsSettings.vue'
 import ConversationsSettings from './settings/ConversationsSettings.vue'
+import ModelsSettings from './settings/ModelsSettings.vue'
 import AdvancedSettings from './settings/AdvancedSettings.vue'
 import AboutSection from './settings/AboutSection.vue'
 
 // 默认快捷键
 const DEFAULT_SHORTCUT = 'F6'
-const DEFAULT_API_KEY = 'sk-b7d7735f91c64ebd9f8dd6b791ebcafb'
+
+// 默认的 Deepseek 模型配置
+const DEFAULT_MODEL = {
+  id: 'default',
+  name: 'Deepseek Chat',
+  type: 'deepseek-chat',
+  apiKey: 'sk-b7d7735f91c64ebd9f8dd6b791ebcafb',
+  baseUrl: 'https://api.deepseek.com/v1',
+  proxy: '',
+  isActive: true
+}
 
 // 设置数据
 const settings = ref<StoredSettings>({
-  apiKey: '',
   prompts: {},
-  shortcut: '',
+  shortcut: DEFAULT_SHORTCUT,
   conversations: [],
+  models: {
+    default: DEFAULT_MODEL
+  },
   autoGenerate: false,
   systemPrompt: '',
   autoLaunch: false
@@ -103,6 +122,13 @@ const loadSettings = async () => {
     console.log('自启动状态:', autoLaunch)
     
     if (savedSettings) {
+      // 确保有默认模型
+      if (!savedSettings.models || Object.keys(savedSettings.models).length === 0) {
+        savedSettings.models = {
+          default: DEFAULT_MODEL
+        }
+      }
+      
       settings.value = {
         ...savedSettings,
         autoLaunch
@@ -110,10 +136,12 @@ const loadSettings = async () => {
     } else {
       // 如果没有保存的设置，使用默认值
       const defaultSettings = {
-        apiKey: DEFAULT_API_KEY,
         prompts: {},
         shortcut: DEFAULT_SHORTCUT,
         conversations: [],
+        models: {
+          default: DEFAULT_MODEL
+        },
         autoGenerate: false,
         systemPrompt: '',
         autoLaunch: autoLaunch
@@ -124,10 +152,12 @@ const loadSettings = async () => {
     console.error('加载设置失败:', error)
     // 使用默认设置
     const defaultSettings = {
-      apiKey: DEFAULT_API_KEY,
       prompts: {},
       shortcut: DEFAULT_SHORTCUT,
       conversations: [],
+      models: {
+        default: DEFAULT_MODEL
+      },
       autoGenerate: false,
       systemPrompt: '',
       autoLaunch: false
@@ -147,8 +177,7 @@ const loadSettings = async () => {
 const saveSettings = async () => {
   try {
     // 创建一个新的对象，只包含需要保存的基本数据
-    const settingsToSave = {
-      apiKey: settings.value.apiKey || '',
+    const settingsToSave: StoredSettings = {
       shortcut: settings.value.shortcut || '',
       autoGenerate: !!settings.value.autoGenerate,
       systemPrompt: settings.value.systemPrompt || '',
@@ -167,29 +196,31 @@ const saveSettings = async () => {
         id: String(conv.id || ''),
         title: String(conv.title || ''),
         messages: (conv.messages || []).map((msg: Message) => ({
-          role: String(msg.role || ''),
+          role: (msg.role === 'assistant' ? 'assistant' : 'user') as 'user' | 'assistant',
           content: String(msg.content || '')
         })),
         lastUpdated: Number(conv.lastUpdated || Date.now())
-      }))
+      })),
+      // 确保 models 只包含必要的字段
+      models: Object.entries(settings.value.models || {}).reduce((acc, [key, model]) => {
+        acc[key] = {
+          id: String(model.id || ''),
+          name: String(model.name || ''),
+          type: String(model.type || ''),
+          apiKey: String(model.apiKey || ''),
+          baseUrl: String(model.baseUrl || ''),
+          proxy: String(model.proxy || ''),
+          isActive: !!model.isActive
+        }
+        return acc
+      }, {} as Record<string, Model>)
     }
 
-    // 先尝试序列化，确保数据可以被正确转换
-    const serializedData = JSON.stringify(settingsToSave)
-    const parsedData = JSON.parse(serializedData)
-
-    console.log('正在保存设置:', serializedData)
-    const success = await window.electronAPI.saveSettings(parsedData)
-    if (success) {
-      ElMessage.success('设置保存成功')
-    } else {
-      ElMessage.error('设置保存失败')
-    }
-    return success
+    await window.electronAPI.saveSettings(settingsToSave)
+    ElMessage.success('保存成功')
   } catch (error) {
-    console.error('保存设置时出错:', error)
-    ElMessage.error('保存设置时出错')
-    return false
+    console.error('保存设置失败:', error)
+    ElMessage.error('保存设置失败')
   }
 }
 

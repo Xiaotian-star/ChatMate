@@ -12,6 +12,17 @@ export interface Conversation {
   lastUpdated: number
 }
 
+// 模型配置接口
+export interface Model {
+  id: string
+  name: string
+  type: string
+  apiKey: string
+  baseUrl?: string
+  proxy?: string
+  isActive: boolean
+}
+
 // 设置类型
 export interface Prompt {
   title: string
@@ -20,10 +31,10 @@ export interface Prompt {
 }
 
 export interface StoredSettings {
-  apiKey: string
   prompts: Record<string, Prompt>
   shortcut: string
   conversations: Conversation[]
+  models: Record<string, Model>
   autoGenerate: boolean
   systemPrompt: string
   autoLaunch?: boolean

@@ -23,12 +23,16 @@
         <span>基础设置</span>
       </el-menu-item>
       <el-menu-item index="prompts">
-        <el-icon><ChatDotRound /></el-icon>
+        <el-icon><Document /></el-icon>
         <span>预设人设</span>
       </el-menu-item>
       <el-menu-item index="conversations">
         <el-icon><ChatLineSquare /></el-icon>
         <span>会话管理</span>
+      </el-menu-item>
+      <el-menu-item index="models">
+        <el-icon><Monitor /></el-icon>
+        <span>模型管理</span>
       </el-menu-item>
       <el-menu-item index="advanced">
         <el-icon><Tools /></el-icon>
@@ -45,7 +49,7 @@
 <script setup lang="ts">
 import { ref } from 'vue'
 import { ElMessage } from 'element-plus'
-import { Setting, ChatDotRound, Tools, InfoFilled, ChatLineSquare } from '@element-plus/icons-vue'
+import { Setting, ChatDotRound, Tools, InfoFilled, ChatLineSquare, Document, Monitor } from '@element-plus/icons-vue'
 
 const version = ref(window.electron?.process?.versions?.app || '1.0.0')
 const checkingUpdate = ref(false)

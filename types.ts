@@ -1,15 +1,22 @@
-// 消息类型
+// 消息接口
 export interface Message {
   role: 'user' | 'assistant'
   content: string
 }
 
-// 对话类型
+// 会话接口
 export interface Conversation {
   id: string
   title: string
   messages: Message[]
   lastUpdated: number
+}
+
+// 提示词接口
+export interface Prompt {
+  title: string
+  content: string
+  isDefault?: boolean
 }
 
 // 模型配置接口
@@ -18,16 +25,9 @@ export interface Model {
   name: string
   type: string
   apiKey: string
-  baseUrl?: string
-  proxy?: string
+  baseUrl: string
+  proxy: string
   isActive: boolean
-}
-
-// 提示词接口
-export interface Prompt {
-  title: string
-  content: string
-  isDefault: boolean
 }
 
 // 存储设置接口
@@ -57,20 +57,4 @@ export interface ElectronAPI {
     persona: string
     signal: AbortSignal
   }) => Promise<string[]>
-}
-
-export interface Settings {
-  apiKey?: string
-  prompts?: Record<string, string>
-  shortcut?: string
-}
-
-export interface Window {
-  electronAPI: {
-    getAIResponse: (text: string, persona: string) => Promise<string>
-    getSettings: () => Promise<Settings>
-    saveSettings: (settings: Settings) => Promise<void>
-    onSelectedText: (callback: (text: string) => void) => () => void
-    closePopup: () => void
-  }
 } 

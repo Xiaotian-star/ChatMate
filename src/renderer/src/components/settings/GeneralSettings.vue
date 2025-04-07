@@ -2,69 +2,47 @@
   <div class="settings-section">
     <h2 class="section-title">基础设置</h2>
     
-    <el-form-item label="DeepSeek API Key">
-      <el-input 
-        v-model="settings.apiKey" 
-        type="password" 
-        show-password 
-        class="api-key-input"
-        placeholder="请输入你的 DeepSeek API Key"
-      >
-        <template #append>
-          <el-tooltip content="API Key 用于访问 DeepSeek 的服务" placement="top">
-            <el-icon><QuestionFilled /></el-icon>
-          </el-tooltip>
-        </template>
-      </el-input>
+    <el-form-item label="快捷键">
+      <el-input
+        v-model="settings.shortcut"
+        placeholder="点击输入快捷键"
+        readonly
+        @keydown="handleKeyDown"
+        @focus="handleFocus"
+      />
+      <div class="form-item-tip">
+        设置呼出助手的快捷键，点击输入框后按下想要设置的按键组合
+      </div>
     </el-form-item>
 
     <el-form-item label="开机自启">
       <el-switch
         v-model="settings.autoLaunch"
         @change="handleAutoLaunchChange"
-        active-text="开启"
-        inactive-text="关闭"
       />
-      <div class="setting-tip">
-        开启后，系统启动时会自动启动 ChatMate
+      <div class="form-item-tip">
+        开启后，系统启动时会自动运行助手
       </div>
     </el-form-item>
 
-    <el-form-item label="快捷键">
-      <div class="shortcut-settings">
-        <div class="shortcut-item">
-          <div class="shortcut-label">
-            <span>快捷键</span>
-            <el-tooltip content="用于打开主窗口的快捷键" placement="top">
-              <el-icon><QuestionFilled /></el-icon>
-            </el-tooltip>
-          </div>
-          <div class="shortcut-input">
-            <el-input
-              v-model="settings.shortcut"
-              :placeholder="isRecording ? '请按下快捷键组合...' : '点击开始录制'"
-              :readonly="true"
-              :class="{ 'is-recording': isRecording, 'is-invalid': !shortcutStatus.main.isValid }"
-              @click="startRecording"
-              @keydown.stop="recordShortcut"
-              @keyup.stop="stopRecording"
-            >
-              <template #append>
-                <el-button @click="resetShortcut">重置</el-button>
-              </template>
-            </el-input>
-            <div v-if="!shortcutStatus.main.isValid" class="error-message">
-              {{ shortcutStatus.main.message }}
-            </div>
-            <div class="shortcut-status" :class="{ 'error': !shortcutStatus.main.isValid }">
-              <el-icon :class="{ 'success': shortcutStatus.main.isValid, 'error': !shortcutStatus.main.isValid }">
-                <CircleCheckFilled v-if="shortcutStatus.main.isValid" />
-                <CircleCloseFilled v-else />
-              </el-icon>
-              {{ shortcutStatus.main.message || '当前快捷键可用' }}
-            </div>
-          </div>
-        </div>
+    <el-form-item label="自动生成">
+      <el-switch
+        v-model="settings.autoGenerate"
+      />
+      <div class="form-item-tip">
+        开启后，选中文本时会自动生成回复
+      </div>
+    </el-form-item>
+
+    <el-form-item label="系统提示词">
+      <el-input
+        v-model="settings.systemPrompt"
+        type="textarea"
+        :rows="4"
+        placeholder="设置系统级提示词，会添加到每次对话的开头"
+      />
+      <div class="form-item-tip">
+        设置系统级提示词，将会添加到每次对话的开头
       </div>
     </el-form-item>
 
@@ -207,13 +185,21 @@ const handleAutoLaunchChange = async (value: boolean) => {
   try {
     const success = await window.electronAPI.setAutoLaunch(value)
     if (!success) {
-      emit('update:settings', { ...props.settings, autoLaunch: !value })
-      ElMessage.error('设置自启动失败')
+      ElMessage.error('设置自动启动失败')
+      // 还原开关状态
+      emit('update:settings', {
+        ...props.settings,
+        autoLaunch: !value
+      })
     }
   } catch (error) {
-    console.error('设置自启动时出错:', error)
-    emit('update:settings', { ...props.settings, autoLaunch: !value })
-    ElMessage.error('设置自启动时出错')
+    console.error('设置自动启动时出错:', error)
+    ElMessage.error('设置自动启动时出错')
+    // 还原开关状态
+    emit('update:settings', {
+      ...props.settings,
+      autoLaunch: !value
+    })
   }
 }
 
@@ -254,6 +240,37 @@ const importConfig = async () => {
     console.error('导入配置失败:', error)
   }
 }
+
+// 处理快捷键输入
+const handleKeyDown = (e: KeyboardEvent) => {
+  e.preventDefault()
+  
+  const keys = []
+  if (e.ctrlKey) keys.push('Control')
+  if (e.shiftKey) keys.push('Shift')
+  if (e.altKey) keys.push('Alt')
+  if (e.metaKey) keys.push('Command')
+  
+  // 添加主键（如果不是修饰键）
+  const key = e.key
+  if (!['Control', 'Shift', 'Alt', 'Meta'].includes(key)) {
+    keys.push(key.toUpperCase())
+  }
+  
+  if (keys.length > 0) {
+    const shortcut = keys.join('+')
+    emit('update:settings', {
+      ...props.settings,
+      shortcut
+    })
+  }
+}
+
+// 处理输入框聚焦
+const handleFocus = (e: FocusEvent) => {
+  const input = e.target as HTMLInputElement
+  input.placeholder = '请按下快捷键组合'
+}
 </script>
 
 <style scoped>
@@ -272,72 +289,10 @@ const importConfig = async () => {
   font-weight: 600;
 }
 
-.api-key-input {
-  max-width: 500px;
-}
-
-.shortcut-settings {
-  margin: 20px 0;
-}
-
-.shortcut-item {
-  margin-bottom: 20px;
-}
-
-.shortcut-label {
-  display: flex;
-  align-items: center;
-  margin-bottom: 8px;
-  gap: 8px;
-}
-
-.shortcut-input {
-  position: relative;
-}
-
-.error-message {
-  color: var(--el-color-danger);
-  font-size: 12px;
-  margin-top: 4px;
-}
-
-.is-recording {
-  background-color: var(--el-color-primary-light-9);
-}
-
-.is-invalid :deep(.el-input__inner) {
-  border-color: var(--el-color-danger);
-}
-
-.setting-tip {
+.form-item-tip {
+  margin-top: 8px;
   font-size: 12px;
   color: var(--el-text-color-secondary);
-  margin-top: 4px;
-}
-
-.shortcut-status {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-top: 4px;
-  font-size: 12px;
-  color: var(--el-text-color-secondary);
-}
-
-.shortcut-status.error {
-  color: var(--el-color-danger);
-}
-
-.shortcut-status .el-icon {
-  font-size: 14px;
-}
-
-.shortcut-status .el-icon.success {
-  color: var(--el-color-success);
-}
-
-.shortcut-status .el-icon.error {
-  color: var(--el-color-danger);
 }
 
 .config-actions {
