@@ -44,13 +44,32 @@ export interface StoredSettings {
 export interface AIRequestParams {
   text: string
   persona: string
-  signal?: AbortSignal
+  modelId: string
+  modelConfig: {
+    type: string
+    apiKey: string
+    baseUrl?: string
+    proxy?: string
+    model?: string
+    temperature?: number
+    max_tokens?: number
+    systemPrompt?: string
+    // 其他可能的模型特定参数
+    [key: string]: any
+  }
+}
+
+// AI 响应类型
+export interface ModelResponse {
+  modelId: string
+  content?: string
+  error?: string
 }
 
 // 渲染进程API类型
 export interface ElectronAPI {
   // AI 响应相关
-  getAIResponse: (params: AIRequestParams) => Promise<string[]>
+  getAIResponse: (params: AIRequestParams) => Promise<ModelResponse[]>
   
   // 设置相关
   getSettings: () => Promise<StoredSettings>

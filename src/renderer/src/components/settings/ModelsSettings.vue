@@ -75,7 +75,6 @@
             <el-option label="GPT-3.5" value="gpt-3.5-turbo" />
             <el-option label="GPT-4" value="gpt-4" />
             <el-option label="Claude" value="claude" />
-            <el-option label="其他" value="other" />
           </el-select>
         </el-form-item>
         <el-form-item label="API Key" prop="apiKey">

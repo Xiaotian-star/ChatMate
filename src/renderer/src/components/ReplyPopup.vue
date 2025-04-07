@@ -97,11 +97,26 @@
           <button 
             class="generate-btn" 
             @click="getReply"
-            :disabled="!selectedText.trim()"
+            :disabled="!selectedText.trim() || !activeModels.length"
           >
             生成回复
           </button>
         </div>
+      </div>
+
+      <!-- 多模型回复区域 -->
+      <div class="models-replies" v-if="activeModels.length > 0">
+        <ModelReply
+          v-for="model in activeModels"
+          :key="model.id"
+          :model="model"
+          :text="selectedText"
+          :persona="selectedPersona"
+          ref="modelReplies"
+        />
+      </div>
+      <div v-else class="no-models-tip">
+        请在设置中启用至少一个模型
       </div>
 
       <div v-if="loading" class="loading">
@@ -135,7 +150,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted, onUnmounted, nextTick, computed } from 'vue'
-import type { Conversation, StoredSettings, ElectronAPI } from '../../../types'
+import type { Conversation, StoredSettings, ElectronAPI, Model } from '../../../types'
+import ModelReply from './reply/ModelReply.vue'
 
 declare global {
   interface Window {
@@ -157,13 +173,21 @@ const isCreatingSession = ref(false)
 const newSessionName = ref('')
 const sessionNameInput = ref<HTMLInputElement | null>(null)
 const settings = ref<StoredSettings | null>(null)
-let currentRequestController: AbortController | null = null
 const loadingText = ref('生成回复中...')
 
 // 计算属性：自定义会话列表（排除默认会话）
 const customSessions = computed(() => {
   return sessions.value.filter(session => session.id !== 'default')
 })
+
+// 新增：计算已启用的模型列表
+const activeModels = computed(() => {
+  if (!settings.value?.models) return []
+  return Object.values(settings.value.models).filter(model => model.isActive)
+})
+
+// 模型回复组件引用
+const modelReplies = ref<InstanceType<typeof ModelReply>[]>([])
 
 // 获取当前会话名称
 function getCurrentSessionName() {
@@ -356,9 +380,6 @@ onMounted(async () => {
     cleanup()
     cleanupAutoGenerate()
     clearInterval(settingsInterval)
-    if (currentRequestController) {
-      currentRequestController.abort()
-    }
   })
 })
 
@@ -374,67 +395,26 @@ async function selectPersona(persona: string) {
 async function getReply() {
   if (!selectedText.value.trim() || !settings.value) return
   
-  // 如果存在正在进行的请求，取消它
-  if (currentRequestController) {
-    console.log('取消之前的请求...')
-    currentRequestController.abort()
-    loadingText.value = '已取消之前的请求，重新生成中...'
-  } else {
-    loadingText.value = '生成回复中...'
+  const prompt = Object.values(settings.value.prompts).find(p => p.title === selectedPersona.value)
+  if (!prompt) {
+    error.value = '未找到选中的人设'
+    return
   }
-  
-  // 创建新的 AbortController
-  currentRequestController = new AbortController()
-  
-  loading.value = true
-  error.value = ''
-  replies.value = []
-  copiedIndex.value = -1
-  
-  try {
-    const prompt = Object.values(settings.value.prompts).find(p => p.title === selectedPersona.value)
-    if (!prompt) {
-      throw new Error('未找到选中的人设')
-    }
 
-    const response = await window.electronAPI.getAIResponse({
-      text: selectedText.value,
-      persona: prompt.content,
-      signal: currentRequestController.signal
-    })
-    
-    if (Array.isArray(response)) {
-      replies.value = response
-      // 保存对话到当前会话
-      await saveToCurrentSession(selectedText.value, response[0])
-    } else {
-      console.error('回复格式错误:', response)
-      error.value = '回复格式错误'
-    }
-  } catch (err) {
-    if (err instanceof Error && err.name === 'AbortError') {
-      console.log('请求已取消')
-      return
-    }
-    console.error('获取回复失败:', err)
-    error.value = err instanceof Error ? err.message : '获取回复失败'
-  } finally {
-    loading.value = false
-    loadingText.value = '生成回复中...'
-    currentRequestController = null
-  }
+  // 并发获取所有启用的模型的回复
+  modelReplies.value.forEach(modelReply => {
+    modelReply.getReply()
+  })
 }
 
 // 保存对话到当前会话
-async function saveToCurrentSession(userMessage: string, aiResponse: string) {
+async function saveToCurrentSession(userMessage: string, aiResponses: { modelId: string, response: string }[]) {
   try {
     let currentSession = sessions.value.find(s => s.id === currentSessionId.value)
     
-    // 如果找不到当前会话，使用默认会话
     if (!currentSession) {
       currentSession = sessions.value.find(s => s.id === 'default')
       if (!currentSession) {
-        // 如果默认会话也不存在，创建它
         currentSession = {
           id: 'default',
           title: '默认会话',
@@ -446,15 +426,22 @@ async function saveToCurrentSession(userMessage: string, aiResponse: string) {
       currentSessionId.value = 'default'
     }
 
-    // 添加新消息
     if (!currentSession.messages) {
       currentSession.messages = []
     }
     
-    currentSession.messages.push(
-      { role: 'user', content: userMessage },
-      { role: 'assistant', content: aiResponse }
-    )
+    // 添加用户消息
+    currentSession.messages.push({ role: 'user', content: userMessage })
+    
+    // 添加每个模型的回复
+    aiResponses.forEach(({ modelId, response }) => {
+      const model = settings.value?.models[modelId]
+      currentSession!.messages.push({
+        role: 'assistant',
+        content: `[${model?.name || 'AI'}] ${response}`
+      })
+    })
+    
     currentSession.lastUpdated = Date.now()
 
     // 保存更新后的设置
@@ -473,7 +460,6 @@ async function saveToCurrentSession(userMessage: string, aiResponse: string) {
     }
 
     await window.electronAPI.saveSettings(settingsToSave)
-    console.log('对话已保存到会话:', currentSession.title)
   } catch (err) {
     console.error('保存对话失败:', err)
     error.value = '保存对话失败'
@@ -531,9 +517,6 @@ function stopDrag() {
 }
 
 onUnmounted(() => {
-  if (currentRequestController) {
-    currentRequestController.abort()
-  }
   document.removeEventListener('mousemove', onDrag)
   document.removeEventListener('mouseup', stopDrag)
 })
@@ -998,5 +981,25 @@ textarea:focus {
 .session-item.active .delete-btn:hover {
   background: rgba(255, 255, 255, 0.2);
   color: white;
+}
+
+/* 添加新的样式 */
+.models-replies {
+  flex: 1;
+  overflow-y: auto;
+  padding: 16px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.no-models-tip {
+  text-align: center;
+  padding: 24px;
+  color: #999;
+  font-size: 14px;
+  background: #f5f5f5;
+  border-radius: 8px;
+  margin: 16px;
 }
 </style> 

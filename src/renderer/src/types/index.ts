@@ -73,4 +73,22 @@ export interface Window {
     onSelectedText: (callback: (text: string) => void) => () => void
     closePopup: () => void
   }
+}
+
+export interface AIRequestParams {
+  text: string
+  persona: string
+  modelId: string
+  modelConfig: {
+    type: string
+    apiKey: string
+    baseUrl?: string
+    proxy?: string
+    model?: string
+    temperature?: number
+    max_tokens?: number
+    systemPrompt?: string
+    // 其他可能的模型特定参数
+    [key: string]: any
+  }
 } 

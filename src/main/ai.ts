@@ -6,94 +6,170 @@ import type { AIRequestParams } from '../types'
 // 加载环境变量
 dotenv.config()
 
+interface ModelResponse {
+  modelId: string
+  content?: string
+  error?: string
+}
+
 // 获取单个 AI 回复
-async function getSingleResponse(apiKey: string, systemPrompt: string, userText: string): Promise<string> {
-  const response = await axios.post(
-    'https://api.deepseek.com/v1/chat/completions',
-    {
-      model: 'deepseek-chat',
-      messages: [
-        {
-          role: 'system',
-          content: systemPrompt
-        },
-        {
-          role: 'user',
-          content: userText
+async function getSingleResponse(params: AIRequestParams, index: number): Promise<ModelResponse> {
+  const { modelConfig, modelId } = params
+  const { type, apiKey, baseUrl, model } = modelConfig
+
+  try {
+    // 根据不同模型类型构建请求
+    let requestData: any
+    let requestUrl: string
+    let headers: Record<string, string> = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${apiKey}`
+    }
+
+    // 构建系统提示词
+    const systemPrompt = `${modelConfig.systemPrompt}\n请生成第 ${index + 1} 个独特的回复。`
+
+    switch (type) {
+      case 'deepseek-chat':
+        requestUrl = `${baseUrl}/chat/completions`
+        requestData = {
+          model: model || 'deepseek-chat',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: params.text }
+          ],
+          temperature: modelConfig.temperature || 0.7,
+          max_tokens: modelConfig.max_tokens || 2000,
+          n: 1,
+          stream: false
         }
-      ],
-      temperature: 0.7,
-      n: 1,
-      stream: false
-    },
-    {
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${apiKey}`
+        break
+
+      case 'gpt-3.5-turbo':
+      case 'gpt-4':
+        requestUrl = `${baseUrl}/chat/completions`
+        requestData = {
+          model: model || type,
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: params.text }
+          ],
+          temperature: modelConfig.temperature || 0.7,
+          max_tokens: modelConfig.max_tokens || 2000,
+          n: 1,
+          stream: false
+        }
+        break
+
+      case 'claude':
+        requestUrl = `${baseUrl}/messages`
+        requestData = {
+          model: model || 'claude-3-opus-20240229',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: params.text }
+          ],
+          temperature: modelConfig.temperature || 0.7,
+          max_tokens: modelConfig.max_tokens || 2000
+        }
+        headers['anthropic-version'] = '2023-06-01'
+        break
+
+      default:
+        return {
+          modelId,
+          error: `不支持的模型类型: ${type}`
+        }
+    }
+
+    // 发送请求
+    const response = await axios.post(requestUrl, requestData, { headers })
+
+    // 解析不同模型的响应
+    let content = ''
+    switch (type) {
+      case 'deepseek-chat':
+      case 'gpt-3.5-turbo':
+      case 'gpt-4':
+        if (response.data?.choices?.[0]?.message?.content) {
+          content = response.data.choices[0].message.content
+        }
+        break
+
+      case 'claude':
+        if (response.data?.content?.[0]?.text) {
+          content = response.data.content[0].text
+        }
+        break
+    }
+
+    if (!content) {
+      return {
+        modelId,
+        error: 'API 响应格式错误'
       }
     }
-  )
 
-  if (!response.data || !response.data.choices || !response.data.choices[0]) {
-    throw new Error('API 响应格式错误')
-  }
+    return {
+      modelId,
+      content: content.trim()
+    }
+  } catch (error) {
+    console.error(`模型 ${modelId} 请求失败:`, error)
+    let errorMessage = '请求失败'
+    
+    if (axios.isAxiosError(error)) {
+      if (error.response?.status === 401) {
+        errorMessage = 'API Key 无效'
+      } else if (error.response?.data?.error?.message) {
+        errorMessage = error.response.data.error.message
+      } else if (error.message) {
+        errorMessage = error.message
+      }
+    }
 
-  const choice = response.data.choices[0]
-  if (typeof choice === 'string') {
-    return choice.trim()
-  } else if (choice.message && choice.message.content) {
-    return choice.message.content.trim()
-  } else {
-    throw new Error('无效的回复格式')
+    return {
+      modelId,
+      error: errorMessage
+    }
   }
 }
 
 // 获取 AI 回复
-export async function getAIResponse(params: AIRequestParams): Promise<string[]> {
+export async function getAIResponse(params: AIRequestParams): Promise<ModelResponse[]> {
   try {
-    // 获取设置
-    const settings = await getSettings()
-    const apiKey = settings.apiKey || process.env.DEEPSEEK_API_KEY
-
-    if (!apiKey) {
-      throw new Error('请先设置 API Key')
+    if (!params.modelConfig.apiKey) {
+      return [{
+        modelId: params.modelId,
+        error: '请先设置 API Key'
+      }]
     }
 
-    // 获取人设提示词
-    const persona = params.persona
-    const systemPrompt = persona && settings.prompts[persona]
-      ? settings.prompts[persona]
-      : '你是一个高情商的AI助手，擅长提供简短、得体、自然的回复，像真人对话一样。每次回复不超过50字。'
-
     // 获取3个不同的回复
-    const responses: string[] = []
     const numResponses = 3
-    const promises = []
+    const promises: Promise<ModelResponse>[] = []
 
     for (let i = 0; i < numResponses; i++) {
-      // 为每个请求添加一些随机性，以获得不同的回复
-      const modifiedPrompt = `${systemPrompt}\n请生成第 ${i + 1} 个独特的回复。`
-      promises.push(getSingleResponse(apiKey, modifiedPrompt, params.text))
+      promises.push(getSingleResponse(params, i))
     }
 
     // 并行请求以提高速度
     const results = await Promise.all(promises)
-    responses.push(...results)
 
-    // 过滤掉空回复
-    const validResponses = responses.filter(reply => reply)
-
-    if (validResponses.length === 0) {
-      throw new Error('未能生成有效回复')
+    // 过滤并处理结果
+    const validResults = results.filter(result => result.content)
+    
+    if (validResults.length === 0) {
+      // 如果所有请求都失败，返回第一个错误
+      return [results[0]]
     }
 
-    return validResponses
+    return validResults
   } catch (error) {
     console.error('获取 AI 回复失败:', error)
-    if (axios.isAxiosError(error) && error.response) {
-      console.error('API 错误详情:', error.response.data)
-      throw new Error(`API 请求失败: ${error.response.data.error?.message || error.message}`)
-    }
-    throw error
+    return [{
+      modelId: params.modelId,
+      error: '获取回复失败'
+    }]
   }
 } 
