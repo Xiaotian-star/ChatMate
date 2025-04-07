@@ -28,12 +28,12 @@
           >
             <div class="session-title">{{ session.title }}</div>
             <div class="session-time">{{ formatTime(session.lastUpdated) }}</div>
-            <div class="session-context" v-if="session.messages?.length">
+            <!-- <div class="session-context" v-if="session.messages?.length">
               <div class="context-item" v-for="(msg, idx) in session.messages.slice(-2)" :key="idx">
                 <div class="context-role">{{ msg.role === 'user' ? '我' : 'AI' }}:</div>
                 <div class="context-content">{{ msg.content }}</div>
               </div>
-            </div>
+            </div> -->
             <button 
               class="delete-btn" 
               @click.stop="deleteSession(session.id)"
@@ -106,7 +106,7 @@
 
       <div v-if="loading" class="loading">
         <div class="loading-spinner"></div>
-        <div class="loading-text">生成回复中...</div>
+        <div class="loading-text">{{ loadingText }}</div>
       </div>
       
       <div v-else-if="error" class="error">
@@ -157,6 +157,8 @@ const isCreatingSession = ref(false)
 const newSessionName = ref('')
 const sessionNameInput = ref<HTMLInputElement | null>(null)
 const settings = ref<StoredSettings | null>(null)
+let currentRequestController: AbortController | null = null
+const loadingText = ref('生成回复中...')
 
 // 计算属性：自定义会话列表（排除默认会话）
 const customSessions = computed(() => {
@@ -180,11 +182,33 @@ async function loadSettings() {
       settings.value = savedSettings
       // 加载保存的会话数据
       if (Array.isArray(savedSettings.conversations)) {
+        // 确保默认会话存在
+        const hasDefaultSession = savedSettings.conversations.some(s => s.id === 'default')
+        if (!hasDefaultSession) {
+          savedSettings.conversations.push({
+            id: 'default',
+            title: '默认会话',
+            messages: [],
+            lastUpdated: Date.now()
+          })
+          await window.electronAPI.saveSettings(savedSettings)
+        }
         sessions.value = savedSettings.conversations
         console.log('已加载保存的会话:', sessions.value)
       } else {
-        sessions.value = []
-        console.log('没有找到保存的会话，使用空数组')
+        // 如果没有会话数据，创建默认会话
+        sessions.value = [{
+          id: 'default',
+          title: '默认会话',
+          messages: [],
+          lastUpdated: Date.now()
+        }]
+        // 保存初始化的会话数据
+        await window.electronAPI.saveSettings({
+          ...savedSettings,
+          conversations: sessions.value
+        })
+        console.log('创建了默认会话')
       }
       
       // 如果当前选中的人设不在设置中，选择第一个可用的人设
@@ -231,7 +255,7 @@ async function confirmNewSession() {
     }
     
     console.log('新会话数据:', newSession)
-    sessions.value.push(newSession)
+    sessions.value = [...sessions.value, newSession]
     currentSessionId.value = sessionId
     
     console.log('正在获取当前设置...')
@@ -241,7 +265,15 @@ async function confirmNewSession() {
     // 创建一个只包含可序列化数据的设置对象
     const settingsToSave = {
       ...currentSettings,
-      conversations: sessions.value
+      conversations: sessions.value.map(session => ({
+        id: String(session.id),
+        title: String(session.title),
+        messages: (session.messages || []).map(msg => ({
+          role: msg.role === 'user' || msg.role === 'assistant' ? msg.role : 'user',
+          content: String(msg.content)
+        })),
+        lastUpdated: Number(session.lastUpdated)
+      }))
     }
     
     console.log('正在保存更新后的设置...', settingsToSave)
@@ -324,6 +356,9 @@ onMounted(async () => {
     cleanup()
     cleanupAutoGenerate()
     clearInterval(settingsInterval)
+    if (currentRequestController) {
+      currentRequestController.abort()
+    }
   })
 })
 
@@ -339,6 +374,18 @@ async function selectPersona(persona: string) {
 async function getReply() {
   if (!selectedText.value.trim() || !settings.value) return
   
+  // 如果存在正在进行的请求，取消它
+  if (currentRequestController) {
+    console.log('取消之前的请求...')
+    currentRequestController.abort()
+    loadingText.value = '已取消之前的请求，重新生成中...'
+  } else {
+    loadingText.value = '生成回复中...'
+  }
+  
+  // 创建新的 AbortController
+  currentRequestController = new AbortController()
+  
   loading.value = true
   error.value = ''
   replies.value = []
@@ -352,20 +399,84 @@ async function getReply() {
 
     const response = await window.electronAPI.getAIResponse({
       text: selectedText.value,
-      persona: prompt.content
+      persona: prompt.content,
+      signal: currentRequestController.signal
     })
     
     if (Array.isArray(response)) {
       replies.value = response
+      // 保存对话到当前会话
+      await saveToCurrentSession(selectedText.value, response[0])
     } else {
       console.error('回复格式错误:', response)
       error.value = '回复格式错误'
     }
   } catch (err) {
+    if (err instanceof Error && err.name === 'AbortError') {
+      console.log('请求已取消')
+      return
+    }
     console.error('获取回复失败:', err)
     error.value = err instanceof Error ? err.message : '获取回复失败'
   } finally {
     loading.value = false
+    loadingText.value = '生成回复中...'
+    currentRequestController = null
+  }
+}
+
+// 保存对话到当前会话
+async function saveToCurrentSession(userMessage: string, aiResponse: string) {
+  try {
+    let currentSession = sessions.value.find(s => s.id === currentSessionId.value)
+    
+    // 如果找不到当前会话，使用默认会话
+    if (!currentSession) {
+      currentSession = sessions.value.find(s => s.id === 'default')
+      if (!currentSession) {
+        // 如果默认会话也不存在，创建它
+        currentSession = {
+          id: 'default',
+          title: '默认会话',
+          messages: [],
+          lastUpdated: Date.now()
+        }
+        sessions.value.push(currentSession)
+      }
+      currentSessionId.value = 'default'
+    }
+
+    // 添加新消息
+    if (!currentSession.messages) {
+      currentSession.messages = []
+    }
+    
+    currentSession.messages.push(
+      { role: 'user', content: userMessage },
+      { role: 'assistant', content: aiResponse }
+    )
+    currentSession.lastUpdated = Date.now()
+
+    // 保存更新后的设置
+    const currentSettings = await window.electronAPI.getSettings()
+    const settingsToSave = {
+      ...currentSettings,
+      conversations: sessions.value.map(session => ({
+        id: String(session.id),
+        title: String(session.title),
+        messages: (session.messages || []).map(msg => ({
+          role: msg.role === 'user' || msg.role === 'assistant' ? msg.role : 'user',
+          content: String(msg.content)
+        })),
+        lastUpdated: Number(session.lastUpdated)
+      }))
+    }
+
+    await window.electronAPI.saveSettings(settingsToSave)
+    console.log('对话已保存到会话:', currentSession.title)
+  } catch (err) {
+    console.error('保存对话失败:', err)
+    error.value = '保存对话失败'
   }
 }
 
@@ -420,6 +531,9 @@ function stopDrag() {
 }
 
 onUnmounted(() => {
+  if (currentRequestController) {
+    currentRequestController.abort()
+  }
   document.removeEventListener('mousemove', onDrag)
   document.removeEventListener('mouseup', stopDrag)
 })
@@ -439,13 +553,13 @@ async function deleteSession(sessionId: string) {
     const settingsToSave = {
       ...currentSettings,
       conversations: sessions.value.map(session => ({
-        id: session.id,
-        title: session.title,
-        messages: session.messages.map(msg => ({
-          role: msg.role,
-          content: msg.content
+        id: String(session.id),
+        title: String(session.title),
+        messages: (session.messages || []).map(msg => ({
+          role: msg.role === 'user' || msg.role === 'assistant' ? msg.role : 'user',
+          content: String(msg.content)
         })),
-        lastUpdated: session.lastUpdated
+        lastUpdated: Number(session.lastUpdated)
       }))
     }
     

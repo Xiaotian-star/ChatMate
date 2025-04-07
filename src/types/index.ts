@@ -33,6 +33,7 @@ export interface StoredSettings {
 export interface AIRequestParams {
   text: string
   persona: string
+  signal?: AbortSignal
 }
 
 // 渲染进程API类型

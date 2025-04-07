@@ -26,6 +26,12 @@
             v-model:settings="settings"
           />
 
+          <!-- 会话管理 -->
+          <ConversationsSettings
+            v-if="activeMenu === 'conversations'"
+            v-model:settings="settings"
+          />
+
           <!-- 高级设置 -->
           <AdvancedSettings
             v-if="activeMenu === 'advanced'"
@@ -61,6 +67,7 @@ import TitleBar from './settings/TitleBar.vue'
 import Sidebar from './settings/Sidebar.vue'
 import GeneralSettings from './settings/GeneralSettings.vue'
 import PromptsSettings from './settings/PromptsSettings.vue'
+import ConversationsSettings from './settings/ConversationsSettings.vue'
 import AdvancedSettings from './settings/AdvancedSettings.vue'
 import AboutSection from './settings/AboutSection.vue'
 
