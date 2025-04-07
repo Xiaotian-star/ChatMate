@@ -1,6 +1,6 @@
 {
   "name": "chatmate",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "description": "一个智能对话助手，帮助你在各类社交平台快速生成合适的回复内容",
   "main": "./out/main/index.js",
   "author": "Xiaotian",
