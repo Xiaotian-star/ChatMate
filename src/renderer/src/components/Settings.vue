@@ -4,7 +4,7 @@
     <div class="title-bar">
       <div class="title">
         <el-icon><Setting /></el-icon>
-        WeChat Assistant 设置
+        ChatMate 设置
       </div>
       <div class="window-controls">
         <el-tooltip content="最小化" placement="bottom" :hide-after="1000">
@@ -96,7 +96,7 @@
                 inactive-text="关闭"
               />
               <div class="setting-tip">
-                开启后，系统启动时会自动启动 WeChat Assistant
+                开启后，系统启动时会自动启动 ChatMate
               </div>
             </el-form-item>
 
@@ -227,7 +227,7 @@
           <!-- 关于 -->
           <div v-show="activeMenu === 'about'" class="settings-section">
             <h2 class="section-title">关于</h2>
-            <p>WeChat Assistant 是一个基于 AI 的微信消息助手，帮助你更高效地处理微信消息。</p>
+            <p>ChatMate 是一个基于 AI 的智能对话助手，帮助你更高效地处理各类社交平台的消息。</p>
             <p>当前版本：v{{ currentVersion }}</p>
             <p>
               <el-button type="primary" link @click="checkUpdate">

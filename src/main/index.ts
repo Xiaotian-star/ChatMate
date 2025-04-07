@@ -68,7 +68,7 @@ function createTray() {
   ])
 
   // 设置托盘提示文字
-  tray.setToolTip('WeChat Assistant')
+  tray.setToolTip('ChatMate')
   
   // macOS 和 Windows 的托盘行为不同
   if (process.platform === 'darwin') {
