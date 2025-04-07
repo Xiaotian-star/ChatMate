@@ -58,7 +58,11 @@ const api: ElectronAPI = {
   
   // 其他功能
   onTextSelected: (callback: (text: string) => void) => {
-    const handler = (_: Electron.IpcRendererEvent, text: string) => callback(text)
+    console.log('preload 脚本注册 text-selected 事件监听器')
+    const handler = (_: Electron.IpcRendererEvent, text: string) => {
+      console.log('preload 脚本收到 text-selected 事件，文本内容:', text)
+      callback(text)
+    }
     ipcRenderer.on('text-selected', handler)
     return () => ipcRenderer.removeListener('text-selected', handler)
   },
@@ -77,7 +81,12 @@ const api: ElectronAPI = {
   exportSettings: () => ipcRenderer.invoke('export-settings'),
   
   // 导入设置
-  importSettings: (mode: 'merge' | 'replace') => ipcRenderer.invoke('import-settings', mode)
+  importSettings: (mode: 'merge' | 'replace') => ipcRenderer.invoke('import-settings', mode),
+  
+  // 清空剪贴板
+  clearClipboard: () => {
+    ipcRenderer.send('clear-clipboard')
+  },
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

@@ -5,13 +5,18 @@ module.exports = {
   extends: [
     'eslint:recommended',
     'plugin:vue/vue3-recommended',
-    '@electron-toolkit',
-    '@electron-toolkit/eslint-config-ts/eslint-recommended',
-    '@vue/eslint-config-typescript/recommended',
-    '@vue/eslint-config-prettier'
+    '@electron-toolkit/eslint-config-ts/recommended',
+    '@vue/eslint-config-typescript/recommended'
   ],
   rules: {
-    'vue/require-default-prop': 'off',
-    'vue/multi-word-component-names': 'off'
+    // 关闭一些烦人的规则
+    '@typescript-eslint/no-explicit-any': 'off',
+    '@typescript-eslint/no-unused-vars': 'off',
+    '@typescript-eslint/no-non-null-assertion': 'off',
+    '@typescript-eslint/explicit-function-return-type': 'off',
+    'vue/multi-word-component-names': 'off',
+    'no-unused-vars': 'off',
+    'no-console': 'off',
+    'prefer-const': 'off'
   }
 }

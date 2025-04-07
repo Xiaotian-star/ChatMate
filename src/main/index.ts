@@ -45,12 +45,14 @@ function createTray() {
         if (!popupWindow) {
           createPopupWindow()
         } else {
+          popupWindow.show()
           const clipboardText = clipboard.readText()
+          console.log('读取到的剪贴板内容:', clipboardText)
           if (clipboardText) {
-            popupWindow.webContents.send('selected-text', clipboardText)
+            console.log('准备发送剪贴板内容到渲染进程')
+            popupWindow.webContents.send('text-selected', clipboardText)
             popupWindow.webContents.send('auto-generate')
           }
-          popupWindow.show()
         }
       }
     },
@@ -155,10 +157,12 @@ const registerShortcuts = async () => {
             createPopupWindow()
           } else {
             // 如果窗口存在但隐藏，显示窗口并发送剪贴板内容
-            const clipboardText = clipboard.readText()
             popupWindow.show()
+            const clipboardText = clipboard.readText()
+            console.log('读取到的剪贴板内容:', clipboardText)
             if (clipboardText) {
-              popupWindow.webContents.send('selected-text', clipboardText)
+              console.log('准备发送剪贴板内容到渲染进程')
+              popupWindow.webContents.send('text-selected', clipboardText)
               if (settings.autoGenerate) {
                 popupWindow.webContents.send('auto-generate')
               }
@@ -209,15 +213,17 @@ function createPopupWindow(): void {
   if (popupWindow && !popupWindow.isDestroyed()) {
     popupWindow.show()
     const clipboardText = clipboard.readText()
+    console.log('读取到的剪贴板内容:', clipboardText)
     if (clipboardText) {
-      popupWindow.webContents.send('selected-text', clipboardText)
+      console.log('准备发送剪贴板内容到渲染进程')
+      popupWindow.webContents.send('text-selected', clipboardText)
     }
     return
   }
 
   // 创建新窗口
   popupWindow = new BrowserWindow({
-    width: 600,
+    width: 400,
     height: 600,
     frame: false,
     show: false,
@@ -244,10 +250,15 @@ function createPopupWindow(): void {
   popupWindow.webContents.on('did-finish-load', () => {
     if (!popupWindow || popupWindow.isDestroyed()) return
     
+    // 先显示窗口
     popupWindow.show()
+    
+    // 然后检查剪贴板
     const clipboardText = clipboard.readText()
+    console.log('页面加载完成，读取到的剪贴板内容:', clipboardText)
     if (clipboardText) {
-      popupWindow.webContents.send('selected-text', clipboardText)
+      console.log('准备发送剪贴板内容到渲染进程')
+      popupWindow.webContents.send('text-selected', clipboardText)
     }
   })
 
@@ -470,9 +481,11 @@ ipcMain.handle('save-settings', async (_, settings: StoredSettings) => {
             createPopupWindow()
           } else {
             const clipboardText = clipboard.readText()
-            popupWindow.show()
+            console.log('读取到的剪贴板内容:', clipboardText)
             if (clipboardText) {
-              popupWindow.webContents.send('selected-text', clipboardText)
+              console.log('准备发送剪贴板内容到渲染进程')
+              popupWindow.show()
+              popupWindow.webContents.send('text-selected', clipboardText)
               if (settings.autoGenerate) {
                 popupWindow.webContents.send('auto-generate')
               }
@@ -599,4 +612,9 @@ ipcMain.handle('check-shortcut-available', async (_event, shortcut: string) => {
     console.error('检查快捷键时出错:', error)
     return false
   }
+})
+
+// 清空剪贴板
+ipcMain.on('clear-clipboard', () => {
+  clipboard.writeText('')
 })

@@ -81,7 +81,7 @@
           </button>
         </div>
         <div class="input-actions">
-          <span class="tip">提示: Ctrl + Enter 快速生成回复</span>
+          <span class="tip">提示: Enter 快速生成回复</span>
           <button 
             class="generate-btn" 
             @click="getReply"
@@ -236,16 +236,27 @@ function formatTime(timestamp: number) {
 
 // 监听选中文本事件
 onMounted(async () => {
+  console.log('组件挂载，开始加载设置...')
   await loadSettings()
+  console.log('设置加载完成')
   
   // 监听选中文本事件
+  console.log('开始注册文本选中事件监听器...')
   const cleanup = window.electronAPI.onTextSelected((text: string) => {
-    console.log('收到选中的文本:', text)
+    console.log('渲染进程收到选中的文本:', text)
+    console.log('准备更新 selectedText...')
     selectedText.value = text || ''
+    console.log('selectedText 更新完成:', selectedText.value)
+    // 如果有文本内容，自动生成回复
+    if (text) {
+      getReply()
+    }
   })
+  console.log('文本选中事件监听器注册完成')
 
   // 监听自动生成事件
   const cleanupAutoGenerate = window.electronAPI.onAutoGenerate(() => {
+    console.log('收到自动生成事件')
     if (selectedText.value.trim()) {
       getReply()
     }
@@ -254,9 +265,10 @@ onMounted(async () => {
   // 定期检查设置更新
   const settingsInterval = setInterval(async () => {
     await loadSettings()
-  }, 5000) // 每5秒检查一次设置更新
+  }, 5000)
 
   onUnmounted(() => {
+    console.log('组件卸载，清理事件监听器...')
     cleanup()
     cleanupAutoGenerate()
     clearInterval(settingsInterval)
@@ -312,6 +324,10 @@ async function selectReply(reply: string, index: number) {
     copiedIndex.value = index
     setTimeout(() => {
       copiedIndex.value = -1
+      // 清空原始剪贴板内容
+      selectedText.value = ''
+      // 通知主进程清空剪贴板
+      window.electronAPI.clearClipboard()
     }, 2000)
   })
 }
@@ -382,8 +398,8 @@ async function deleteSession(sessionId: string) {
 
 // 添加键盘事件处理函数
 function handleKeyDown(e: KeyboardEvent) {
-  // 检查是否按下 Ctrl+Enter
-  if (e.ctrlKey && e.key === 'Enter') {
+  // 如果是在输入框中按下 Enter 键（非组合键）
+  if (e.key === 'Enter' && !e.ctrlKey && !e.shiftKey && !e.altKey && !e.metaKey) {
     e.preventDefault() // 阻止默认行为
     if (selectedText.value.trim()) {
       getReply()

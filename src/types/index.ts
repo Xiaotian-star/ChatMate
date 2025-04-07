@@ -73,6 +73,9 @@ export interface ElectronAPI {
   
   // 导入设置
   importSettings: (mode: 'merge' | 'replace') => Promise<{ success: boolean; message: string }>
+  
+  // 清空剪贴板
+  clearClipboard: () => void
 }
 
 // 更新信息类型
