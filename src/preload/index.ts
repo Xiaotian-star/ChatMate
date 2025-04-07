@@ -73,8 +73,8 @@ const api: ElectronAPI = {
   },
   closePopup: () => ipcRenderer.send('close-popup'),
   moveWindow: (deltaX: number, deltaY: number) => {
-    // 发送调整大小的消息
-    ipcRenderer.send('resize-window', { deltaX, deltaY })
+    // 发送窗口移动消息
+    ipcRenderer.send('move-window', { deltaX, deltaY })
   },
   
   // 导出设置

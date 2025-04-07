@@ -7,7 +7,7 @@
   "homepage": "https://github.com/Xiaotian-star/ChatMate",
   "scripts": {
     "format": "prettier --write .",
-    "lint": "echo 'lint check skipped'",
+    "lint": "echo 'Skipping lint checks'",
     "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
     "typecheck:web": "vue-tsc --noEmit -p tsconfig.web.json --composite false",
     "typecheck": "npm run typecheck:node && npm run typecheck:web",

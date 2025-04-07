@@ -229,11 +229,21 @@ function createPopupWindow(): void {
     show: false,
     alwaysOnTop: true,
     resizable: false,
+    maximizable: false,
+    fullscreenable: false,
     useContentSize: true,
     webPreferences: {
       preload: join(__dirname, '../preload/index.js'),
       sandbox: false,
       devTools: true
+    }
+  })
+
+  // 处理窗口移动
+  ipcMain.on('move-window', (_, { deltaX, deltaY }) => {
+    if (popupWindow && !popupWindow.isDestroyed()) {
+      const [x, y] = popupWindow.getPosition()
+      popupWindow.setPosition(x + deltaX, y + deltaY)
     }
   })
 
@@ -295,7 +305,7 @@ function createWindow(): void {
   mainWindow.on('ready-to-show', () => {
     // mainWindow.show() // 注释掉这行，使窗口默认不显示
     // 根据环境决定是否打开开发者工具
-    if (isDevelopment) {
+    if (isDevelopment && mainWindow) {
       mainWindow.webContents.openDevTools()
       // 注册开发者工具快捷键
       globalShortcut.register('CommandOrControl+Shift+I', () => {
@@ -596,7 +606,7 @@ ipcMain.on('resize-window', (_, { deltaX, deltaY }) => {
     popupWindow.setBounds({
       x: currentX + deltaX,
       y: currentY + deltaY,
-      width: 600,
+      width: 400,
       height: 600
     }, true) // true 表示使用动画效果
   }

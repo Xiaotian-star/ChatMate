@@ -70,15 +70,27 @@
       </div>
 
       <div class="reply-options">
-        <div class="buttons">
-          <button 
-            v-for="[key, prompt] in Object.entries(settings?.prompts || {})"
-            :key="key"
-            :class="{ active: selectedPersona === prompt.title }"
-            @click="selectPersona(prompt.title)"
-          >
-            {{ prompt.title }}
-          </button>
+        <div class="role-buttons">
+          <div class="role-row">
+            <button 
+              v-for="[key, prompt] in Object.entries(settings?.prompts || {}).slice(0, 3)"
+              :key="key"
+              :class="{ active: selectedPersona === prompt.title }"
+              @click="selectPersona(prompt.title)"
+            >
+              {{ prompt.title }}
+            </button>
+          </div>
+          <div class="role-row">
+            <button 
+              v-for="[key, prompt] in Object.entries(settings?.prompts || {}).slice(3)"
+              :key="key"
+              :class="{ active: selectedPersona === prompt.title }"
+              @click="selectPersona(prompt.title)"
+            >
+              {{ prompt.title }}
+            </button>
+          </div>
         </div>
         <div class="input-actions">
           <span class="tip">提示: Enter 快速生成回复</span>
@@ -112,7 +124,7 @@
           }"
           @click="selectReply(reply, index)"
         >
-          <div class="reply-number">{{ index + 1 }}</div>
+          <!-- <div class="reply-number">{{ index + 1 }}</div> -->
           <div class="reply-text">{{ reply }}</div>
           <div class="copy-tip">{{ copiedIndex === index ? '已复制!' : '点击复制' }}</div>
         </div>
@@ -354,14 +366,11 @@ function startDrag(e: MouseEvent) {
 function onDrag(e: MouseEvent) {
   if (!isDragging) return
   
-  const deltaX = e.clientX - startX
-  const deltaY = e.clientY - startY
+  // 只发送移动事件，不处理大小调整
+  window.electronAPI.moveWindow(e.clientX - startX, e.clientY - startY)
   
   startX = e.clientX
   startY = e.clientY
-
-  // 只移动窗口位置，不改变大小
-  window.electronAPI.moveWindow(0, 0)
 }
 
 function stopDrag() {
@@ -595,31 +604,55 @@ textarea:focus {
   margin-bottom: 16px;
 }
 
-.buttons {
+.role-buttons {
   display: flex;
+  flex-direction: column;
   gap: 8px;
   margin-bottom: 12px;
 }
 
-.buttons button {
-  padding: 8px 16px;
+.role-row {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.role-row button {
+  flex: 1;
+  padding: 8px 12px;
   border: 1px solid #ddd;
   border-radius: 20px;
   background: white;
   cursor: pointer;
   transition: all 0.2s;
+  white-space: nowrap;
+  min-width: 80px;
+  max-width: 120px;
+  font-size: 13px;
 }
 
-.buttons button.active {
+.role-row button.active {
   background: #1890ff;
   color: white;
   border-color: #1890ff;
+}
+
+.role-row button:hover {
+  background: #e6f7ff;
+  border-color: #1890ff;
+  color: #1890ff;
+}
+
+.role-row button.active:hover {
+  background: #40a9ff;
+  color: white;
 }
 
 .input-actions {
   display: flex;
   justify-content: space-between;
   align-items: center;
+  padding: 0 8px;
 }
 
 .tip {
