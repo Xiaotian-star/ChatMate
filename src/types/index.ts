@@ -45,6 +45,7 @@ export interface AIRequestParams {
   text: string
   persona: string
   modelId: string
+  messageHistory?: Message[]
   modelConfig: {
     type: string
     apiKey: string

@@ -6,6 +6,11 @@ import type { AIRequestParams } from '../types'
 // 加载环境变量
 dotenv.config()
 
+interface Message {
+  role: 'system' | 'user' | 'assistant'
+  content: string
+}
+
 interface ModelResponse {
   modelId: string
   content?: string
@@ -14,7 +19,7 @@ interface ModelResponse {
 
 // 获取单个 AI 回复
 async function getSingleResponse(params: AIRequestParams, index: number): Promise<ModelResponse> {
-  const { modelConfig, modelId } = params
+  const { modelConfig, modelId, messageHistory = [] } = params
   const { type, apiKey, baseUrl, model } = modelConfig
 
   try {
@@ -28,16 +33,20 @@ async function getSingleResponse(params: AIRequestParams, index: number): Promis
 
     // 构建系统提示词
     const systemPrompt = `${modelConfig.systemPrompt}\n请生成第 ${index + 1} 个独特的回复。`
+    
+    // 构建完整的消息历史
+    const messages: Message[] = [
+      { role: 'system', content: systemPrompt },
+      ...messageHistory,
+      { role: 'user', content: params.text }
+    ]
 
     switch (type) {
       case 'deepseek-chat':
         requestUrl = `${baseUrl}/chat/completions`
         requestData = {
           model: model || 'deepseek-chat',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: params.text }
-          ],
+          messages,
           temperature: modelConfig.temperature || 0.7,
           max_tokens: modelConfig.max_tokens || 2000,
           n: 1,
@@ -50,10 +59,7 @@ async function getSingleResponse(params: AIRequestParams, index: number): Promis
         requestUrl = `${baseUrl}/chat/completions`
         requestData = {
           model: model || type,
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: params.text }
-          ],
+          messages,
           temperature: modelConfig.temperature || 0.7,
           max_tokens: modelConfig.max_tokens || 2000,
           n: 1,
@@ -65,10 +71,7 @@ async function getSingleResponse(params: AIRequestParams, index: number): Promis
         requestUrl = `${baseUrl}/messages`
         requestData = {
           model: model || 'claude-3-opus-20240229',
-          messages: [
-            { role: 'system', content: systemPrompt },
-            { role: 'user', content: params.text }
-          ],
+          messages,
           temperature: modelConfig.temperature || 0.7,
           max_tokens: modelConfig.max_tokens || 2000
         }
