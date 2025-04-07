@@ -102,7 +102,7 @@ async function getReply() {
         // 组合系统提示词: 全局系统提示词 + 模型特定提示词 + 人设提示词
         systemPrompt: [
           systemPrompt,
-          modelSpecificConfig.systemPrompt,
+          // modelSpecificConfig.systemPrompt,
           props.persona
         ].filter(Boolean).join('\n\n')
       }

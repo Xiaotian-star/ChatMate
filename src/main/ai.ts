@@ -33,6 +33,7 @@ async function getSingleResponse(params: AIRequestParams, index: number): Promis
 
     // 构建系统提示词
     const systemPrompt = `${modelConfig.systemPrompt}\n请生成第 ${index + 1} 个独特的回复。`
+    console.log(systemPrompt);
     
     // 构建完整的消息历史
     const messages: Message[] = [
