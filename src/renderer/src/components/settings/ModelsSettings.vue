@@ -75,6 +75,10 @@
             <el-option label="GPT-3.5" value="gpt-3.5-turbo" />
             <el-option label="GPT-4" value="gpt-4" />
             <el-option label="Claude" value="claude" />
+            <el-option label="Azure OpenAI" value="azure-openai" />
+            <el-option label="Gemini" value="gemini" />
+            <el-option label="Mistral AI" value="mistral" />
+            <el-option label="Ollama" value="ollama" />
           </el-select>
         </el-form-item>
         <el-form-item label="API Key" prop="apiKey">
@@ -85,10 +89,35 @@
             show-password
           />
         </el-form-item>
-        <el-form-item label="Base URL" prop="baseUrl">
+        <el-form-item 
+          v-if="showBaseUrl"
+          label="Base URL" 
+          prop="baseUrl"
+          :rules="baseUrlRules"
+        >
           <el-input
             v-model="modelForm.baseUrl"
-            placeholder="可选,用于自定义 API 地址"
+            :placeholder="getBaseUrlPlaceholder(modelForm.type)"
+          />
+        </el-form-item>
+        <el-form-item 
+          v-if="modelForm.type === 'azure-openai'"
+          label="API 版本" 
+          prop="apiVersion"
+        >
+          <el-input
+            v-model="modelForm.apiVersion"
+            placeholder="例如: 2023-12-01-preview"
+          />
+        </el-form-item>
+        <el-form-item 
+          v-if="modelForm.type === 'azure-openai'"
+          label="部署名称" 
+          prop="deploymentName"
+        >
+          <el-input
+            v-model="modelForm.deploymentName"
+            placeholder="Azure OpenAI 部署名称"
           />
         </el-form-item>
         <el-form-item label="代理设置" prop="proxy">
@@ -111,7 +140,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { Plus, Edit, Delete } from '@element-plus/icons-vue'
 import { ElMessageBox, ElMessage } from 'element-plus'
 import type { FormInstance, FormRules } from 'element-plus'
@@ -182,6 +211,23 @@ const modelRules: FormRules = {
     { required: true, message: '请输入 API Key', trigger: 'blur' }
   ]
 }
+
+// 是否显示 Base URL 输入框
+const showBaseUrl = computed(() => {
+  const type = modelForm.value.type
+  return ['deepseek-chat', 'gpt-3.5-turbo', 'gpt-4', 'azure-openai', 'ollama'].includes(type)
+})
+
+// Base URL 验证规则
+const baseUrlRules = computed(() => {
+  const type = modelForm.value.type
+  const isRequired = ['deepseek-chat', 'azure-openai', 'ollama'].includes(type)
+  
+  return isRequired ? [
+    { required: true, message: '请输入 Base URL', trigger: 'blur' },
+    { type: 'url', message: '请输入有效的 URL', trigger: 'blur' }
+  ] : []
+})
 
 // 显示添加模型对话框
 const showAddModelDialog = () => {
@@ -288,6 +334,40 @@ const maskApiKey = (apiKey: string) => {
   if (!apiKey) return ''
   return apiKey.slice(0, 3) + '*'.repeat(apiKey.length - 6) + apiKey.slice(-3)
 }
+
+// 获取 Base URL 的占位符文本
+const getBaseUrlPlaceholder = (type: string) => {
+  switch (type) {
+    case 'ollama':
+      return '本地 Ollama 地址，默认: http://localhost:11434'
+    case 'azure-openai':
+      return 'Azure OpenAI 端点地址（必填）'
+    case 'deepseek-chat':
+      return 'Deepseek API 地址（必填）'
+    case 'gpt-3.5-turbo':
+    case 'gpt-4':
+      return '可选，用于自定义 API 地址或代理'
+    default:
+      return ''
+  }
+}
+
+// 监听模型类型变化，设置默认 Base URL
+watch(() => modelForm.value.type, (newType) => {
+  switch (newType) {
+    case 'deepseek-chat':
+      modelForm.value.baseUrl = 'https://api.deepseek.com/v1'
+      break
+    case 'ollama':
+      modelForm.value.baseUrl = 'http://localhost:11434'
+      break
+    case 'azure-openai':
+      modelForm.value.baseUrl = ''  // 需要用户输入 Azure 端点
+      break
+    default:
+      modelForm.value.baseUrl = ''  // 其他模型默认清空
+  }
+})
 </script>
 
 <style scoped>

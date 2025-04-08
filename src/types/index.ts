@@ -12,7 +12,7 @@ export interface Conversation {
   lastUpdated: number
 }
 
-// 模型配置接口
+// 模型类型
 export interface Model {
   id: string
   name: string
@@ -21,6 +21,16 @@ export interface Model {
   baseUrl?: string
   proxy?: string
   isActive: boolean
+  // Azure OpenAI 特定配置
+  apiVersion?: string
+  deploymentName?: string
+  // 通用模型配置
+  model?: string
+  temperature?: number
+  max_tokens?: number
+  systemPrompt?: string
+  // 其他可能的模型特定参数
+  [key: string]: any
 }
 
 // 设置类型
@@ -40,12 +50,11 @@ export interface StoredSettings {
   autoLaunch?: boolean
 }
 
-// AI 请求参数类型
+// AI 请求参数
 export interface AIRequestParams {
   text: string
-  persona: string
   modelId: string
-  messageHistory?: Message[]
+  messageHistory?: Array<{ role: string; content: string }>
   modelConfig: {
     type: string
     apiKey: string
@@ -55,6 +64,9 @@ export interface AIRequestParams {
     temperature?: number
     max_tokens?: number
     systemPrompt?: string
+    // Azure OpenAI 特定配置
+    apiVersion?: string
+    deploymentName?: string
     // 其他可能的模型特定参数
     [key: string]: any
   }
