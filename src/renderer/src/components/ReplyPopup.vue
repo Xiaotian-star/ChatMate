@@ -128,12 +128,13 @@
           <!-- 多模型回复区域 -->
           <div class="models-replies" v-if="activeModels.length > 0">
             <ModelReply
-              v-for="model in activeModels"
+              v-for="(model, index) in activeModels"
               :key="model.id"
               :model="model"
               :text="selectedText"
               :persona="selectedPersona"
               ref="modelReplies"
+              @select-reply="handleReplySelect"
             />
           </div>
           <div v-else class="no-models-tip">
@@ -466,19 +467,20 @@ async function saveToCurrentSession(userMessage: string, aiResponses: { modelId:
   }
 }
 
-// 选择回复并复制到剪贴板
-async function selectReply(reply: string, index: number) {
+// 处理回复选择
+async function handleReplySelect(reply: string, index: number, modelId: string) {
   selectedIndex.value = index
-  navigator.clipboard.writeText(reply).then(() => {
-    copiedIndex.value = index
-    setTimeout(() => {
-      copiedIndex.value = -1
-      // 清空原始剪贴板内容
-      selectedText.value = ''
-      // 通知主进程清空剪贴板
-      window.electronAPI.clearClipboard()
-    }, 2000)
-  })
+  
+  // 保存对话到当前会话
+  await saveToCurrentSession(selectedText.value, [{
+    modelId: modelId,
+    response: reply
+  }])
+  
+  // 清空原始剪贴板内容
+  selectedText.value = ''
+  // 通知主进程清空剪贴板
+  window.electronAPI.clearClipboard()
 }
 
 // 关闭弹窗

@@ -55,6 +55,9 @@ const props = defineProps<{
   persona: string
 }>()
 
+// 添加事件发射器
+const emit = defineEmits(['select-reply'])
+
 // 组件状态
 const loading = ref(false)
 const error = ref('')
@@ -189,6 +192,9 @@ function getModelSpecificConfig(modelType: string): Record<string, any> {
 // 选择回复并复制到剪贴板
 async function selectReply(reply: string, index: number) {
   selectedIndex.value = index
+  // 发射选择回复事件
+  emit('select-reply', reply, index, props.model.id)
+  
   navigator.clipboard.writeText(reply).then(() => {
     copiedIndex.value = index
     setTimeout(() => {

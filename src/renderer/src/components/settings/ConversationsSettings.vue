@@ -237,11 +237,37 @@ const deleteConversation = async (id: string) => {
       }
     )
     
+    // 创建新的会话列表
     const newConversations = props.settings.conversations?.filter(conv => conv.id !== id) || []
-    emit('update:settings', { ...props.settings, conversations: newConversations })
-    ElMessage.success('删除成功')
-  } catch {
-    // 用户取消删除
+    
+    // 创建新的设置对象
+    const newSettings = {
+      ...props.settings,
+      conversations: newConversations
+    }
+
+    // 确保数据可以被序列化
+    const serializedSettings = JSON.parse(JSON.stringify(newSettings))
+    
+    // 保存到存储
+    const success = await window.electronAPI.saveSettings(serializedSettings)
+    
+    if (success) {
+      // 保存成功后更新本地状态
+      emit('update:settings', serializedSettings)
+      ElMessage.success('删除成功')
+    } else {
+      ElMessage.error('保存设置失败')
+      // 如果保存失败，重新加载最新设置
+      const currentSettings = await window.electronAPI.getSettings()
+      emit('update:settings', currentSettings)
+    }
+  } catch (error) {
+    // 用户取消删除或发生错误
+    if (error instanceof Error) {
+      console.error('删除会话失败:', error)
+      ElMessage.error(`删除会话失败：${error.message}`)
+    }
   }
 }
 
@@ -279,17 +305,46 @@ const clearDefaultConversation = async () => {
       }
     )
     
+    // 创建新的会话列表，清空默认会话的消息
     const newConversations = props.settings.conversations?.map(conv => {
       if (conv.id === 'default') {
-        return { ...conv, messages: [] }
+        return { 
+          ...conv, 
+          messages: [],
+          lastUpdated: Date.now()
+        }
       }
       return conv
     }) || []
     
-    emit('update:settings', { ...props.settings, conversations: newConversations })
-    ElMessage.success('默认会话已清空')
-  } catch {
-    // 用户取消操作
+    // 创建新的设置对象
+    const newSettings = {
+      ...props.settings,
+      conversations: newConversations
+    }
+
+    // 确保数据可以被序列化
+    const serializedSettings = JSON.parse(JSON.stringify(newSettings))
+    
+    // 保存到存储
+    const success = await window.electronAPI.saveSettings(serializedSettings)
+    
+    if (success) {
+      // 保存成功后更新本地状态
+      emit('update:settings', serializedSettings)
+      ElMessage.success('默认会话已清空')
+    } else {
+      ElMessage.error('保存设置失败')
+      // 如果保存失败，重新加载最新设置
+      const currentSettings = await window.electronAPI.getSettings()
+      emit('update:settings', currentSettings)
+    }
+  } catch (error) {
+    // 用户取消操作或发生错误
+    if (error instanceof Error) {
+      console.error('清空默认会话失败:', error)
+      ElMessage.error(`清空默认会话失败：${error.message}`)
+    }
   }
 }
 
@@ -306,16 +361,42 @@ const clearAllConversations = async () => {
       }
     )
     
-    // 保留默认会话，但清空其消息
-    const defaultSession = props.settings.conversations?.find(conv => conv.id === 'default')
-    const newConversations = defaultSession 
-      ? [{ ...defaultSession, messages: [] }]
-      : [{ id: 'default', title: '默认会话', messages: [], lastUpdated: Date.now() }]
+    // 创建一个新的默认会话，确保数据结构简单且可序列化
+    const newDefaultSession = {
+      id: 'default',
+      title: '默认会话',
+      messages: [],
+      lastUpdated: Date.now()
+    }
+
+    // 创建一个新的设置对象，只包含必要的数据
+    const cleanSettings = {
+      ...props.settings,
+      conversations: [newDefaultSession]
+    }
+
+    // 确保数据可以被序列化
+    const serializedSettings = JSON.parse(JSON.stringify(cleanSettings))
     
-    emit('update:settings', { ...props.settings, conversations: newConversations })
-    ElMessage.success('已清空所有会话')
-  } catch {
-    // 用户取消清空
+    // 保存到存储
+    const success = await window.electronAPI.saveSettings(serializedSettings)
+    
+    if (success) {
+      // 保存成功后更新本地状态
+      emit('update:settings', serializedSettings)
+      ElMessage.success('已清空所有会话')
+    } else {
+      ElMessage.error('保存设置失败')
+      // 如果保存失败，重新加载最新设置
+      const currentSettings = await window.electronAPI.getSettings()
+      emit('update:settings', currentSettings)
+    }
+  } catch (error) {
+    // 用户取消清空或发生错误
+    if (error instanceof Error) {
+      console.error('清空会话失败:', error)
+      ElMessage.error(`清空会话失败：${error.message}`)
+    }
   }
 }
 </script>
