@@ -7,10 +7,14 @@ import { getAIResponse } from './ai'
 import { getSettings, saveSettings, exportSettings, importSettings } from './settings'
 import { checkForUpdates } from './update'
 
+// 在 macOS 上，在应用启动前就隐藏 dock 图标
+if (process.platform === 'darwin') {
+  app.dock.hide()
+}
+
 // 获取 preload 脚本的路径
 const preload = join(__dirname, '../preload/index.js')
 
-let mainWindow: BrowserWindow | null = null
 let tray: Tray | null = null
 let popupWindow: BrowserWindow | null = null
 let settingsWindow: BrowserWindow | null = null
@@ -24,6 +28,8 @@ let currentAutoGenerateShortcut: string | null = null
 
 // 显示设置窗口
 function showSettingsWindow() {
+
+ 
   if (!settingsWindow || settingsWindow.isDestroyed()) {
     createSettingsWindow()
   } else {
@@ -39,6 +45,8 @@ function showSettingsWindow() {
 function createTray() {
   // 创建托盘图标
   const trayIcon = nativeImage.createFromPath(icon)
+  
+  
   // 调整图标大小为 16x16 (Windows) 或 18x18 (macOS)
   const iconSize = process.platform === 'darwin' ? 18 : 16
   const resizedIcon = trayIcon.resize({ width: iconSize, height: iconSize })
@@ -296,6 +304,12 @@ app.whenReady().then(async () => {
   // 设置应用程序名称
   electronApp.setAppUserModelId('com.electron')
 
+  // 在 macOS 上设置 dock 图标（但保持隐藏状态）
+  if (process.platform === 'darwin') {
+    const dockIcon = nativeImage.createFromPath(icon).resize({ width: 128, height: 128 })
+    app.dock.setIcon(dockIcon)
+  }
+
   // 确保清理所有已注册的快捷键
   globalShortcut.unregisterAll()
   currentMainShortcut = null
@@ -318,11 +332,6 @@ app.whenReady().then(async () => {
     }
   })
   
-  // 在应用启动时隐藏 dock 图标
-  if (process.platform === 'darwin') {
-    app.dock.hide()
-  }
-
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
       showSettingsWindow()
