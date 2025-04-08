@@ -26,6 +26,11 @@ mac:
     - NSDocumentsFolderUsageDescription: Application requests access to the user's Documents folder.
     - NSDownloadsFolderUsageDescription: Application requests access to the user's Downloads folder.
   notarize: false
+  bundleVersion: "${version}"
+  bundleShortVersion: "${version}"
+  identity: "Apple Development: 1416670093@qq.com (5JM4CW6MP2)"
+  hardenedRuntime: true
+  gatekeeperAssess: false
 dmg:
   artifactName: ${name}-${version}.${ext}
 linux:
@@ -39,5 +44,10 @@ appImage:
   artifactName: ${name}-${version}.${ext}
 npmRebuild: false
 publish:
-  provider: generic
-  url: https://example.com/auto-updates
+  provider: github
+  owner: Xiaotian-star
+  repo: ChatMate
+  private: false
+  releaseType: release
+  updaterCacheDirName: chatmate-updater
+  publishAutoUpdate: true

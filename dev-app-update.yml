@@ -1,3 +1,5 @@
-provider: generic
-url: https://example.com/auto-updates
-updaterCacheDirName: electron-app-updater
+provider: github
+owner: Xiaotian-star
+repo: ChatMate
+updaterCacheDirName: chatmate-updater
+appId: com.xiaotian.chatmate

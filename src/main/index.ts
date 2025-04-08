@@ -7,6 +7,7 @@ import { getAIResponse } from './ai'
 import { getSettings, saveSettings, exportSettings, importSettings } from './settings'
 import { checkForUpdates } from './update'
 
+
 // 在 macOS 上，在应用启动前就隐藏 dock 图标
 if (process.platform === 'darwin') {
   app.dock.hide()
@@ -331,6 +332,20 @@ app.whenReady().then(async () => {
       focusedWindow.webContents.toggleDevTools()
     }
   })
+
+  // 配置自动更新
+  if (!isDevelopment) {
+    // 设置自动更新检查间隔（4小时）
+    const FOUR_HOURS = 4 * 60 * 60 * 1000
+    setInterval(() => {
+      checkForUpdates().catch(console.error)
+    }, FOUR_HOURS)
+
+    // 首次启动时检查更新
+    setTimeout(() => {
+      checkForUpdates().catch(console.error)
+    }, 10000) // 延迟10秒检查，等待应用完全启动
+  }
   
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
