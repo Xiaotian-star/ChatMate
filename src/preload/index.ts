@@ -26,6 +26,9 @@ const api: ElectronAPI = {
   getSettings: () => ipcRenderer.invoke('get-settings'),
   saveSettings: (settings: StoredSettings) => ipcRenderer.invoke('save-settings', settings),
   
+  // 版本相关
+  getAppVersion: () => ipcRenderer.invoke('get-app-version'),
+  
   // 自动启动相关
   getAutoLaunch: () => ipcRenderer.invoke('get-auto-launch'),
   setAutoLaunch: (enabled: boolean) => ipcRenderer.invoke('set-auto-launch', enabled),

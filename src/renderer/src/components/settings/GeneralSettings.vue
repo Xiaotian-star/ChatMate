@@ -10,9 +10,9 @@
         @keydown="handleKeyDown"
         @focus="handleFocus"
       />
-      <div class="form-item-tip">
+      <!-- <div class="form-item-tip">
         设置呼出助手的快捷键，点击输入框后按下想要设置的按键组合
-      </div>
+      </div> -->
     </el-form-item>
 
     <el-form-item label="开机自启">
@@ -20,18 +20,18 @@
         v-model="settings.autoLaunch"
         @change="handleAutoLaunchChange"
       />
-      <div class="form-item-tip">
+      <!-- <div class="form-item-tip">
         开启后，系统启动时会自动运行助手
-      </div>
+      </div> -->
     </el-form-item>
 
     <el-form-item label="自动生成">
       <el-switch
         v-model="settings.autoGenerate"
       />
-      <div class="form-item-tip">
+      <!-- <div class="form-item-tip">
         开启后，选中文本时会自动生成回复
-      </div>
+      </div> -->
     </el-form-item>
 
     <el-form-item label="系统提示词">
@@ -41,9 +41,9 @@
         :rows="4"
         placeholder="设置系统级提示词，会添加到每次对话的开头"
       />
-      <div class="form-item-tip">
+      <!-- <div class="form-item-tip">
         设置系统级提示词，将会添加到每次对话的开头
-      </div>
+      </div> -->
     </el-form-item>
 
     <el-form-item label="配置管理">
@@ -51,9 +51,9 @@
         <el-button type="primary" @click="exportConfig">导出配置</el-button>
         <el-button type="success" @click="showImportDialog">导入配置</el-button>
       </div>
-      <div class="setting-tip">
+      <!-- <div class="setting-tip">
         导出配置可以备份你的设置，导入配置可以恢复或合并之前的设置
-      </div>
+      </div> -->
     </el-form-item>
   </div>
 

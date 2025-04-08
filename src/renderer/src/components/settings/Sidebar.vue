@@ -47,13 +47,22 @@
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import { Setting, ChatDotRound, Tools, InfoFilled, ChatLineSquare, Document, Monitor } from '@element-plus/icons-vue'
 
-const version = ref(window.electron?.process?.versions?.app || '1.0.0')
+const version = ref('1.0.0')
 const checkingUpdate = ref(false)
 const activeMenu = ref('general')
+
+// 获取版本号
+async function loadVersion() {
+  try {
+    version.value = await window.electronAPI.getAppVersion()
+  } catch (error) {
+    console.error('获取版本号失败:', error)
+  }
+}
 
 // 检查更新
 async function checkUpdate() {
@@ -93,6 +102,11 @@ const handleMenuSelect = (index: string) => {
   activeMenu.value = index
   emit('menu-select', index)
 }
+
+// 组件挂载时获取版本号
+onMounted(() => {
+  loadVersion()
+})
 </script>
 
 <style scoped>

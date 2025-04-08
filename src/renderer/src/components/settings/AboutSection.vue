@@ -2,21 +2,30 @@
   <div class="settings-section">
     <h2 class="section-title">关于</h2>
     <p>ChatMate 是一个基于 AI 的智能对话助手，帮助你更高效地处理各类社交平台的消息。</p>
-    <p>当前版本：v{{ version }}</p>
+    <!-- <p>当前版本：v{{ version }}</p>
     <p>
       <el-button type="primary" link @click="checkUpdate" :loading="checkingUpdate">
         检查更新
       </el-button>
-    </p>
+    </p> -->
   </div>
 </template>
 
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 
-const version = ref(window.electron?.process?.versions?.app || '1.0.0')
+const version = ref('1.0.0')
 const checkingUpdate = ref(false)
+
+// 获取版本号
+async function loadVersion() {
+  try {
+    version.value = await window.electronAPI.getAppVersion()
+  } catch (error) {
+    console.error('获取版本号失败:', error)
+  }
+}
 
 // 检查更新
 async function checkUpdate() {
@@ -49,6 +58,11 @@ async function checkUpdate() {
     checkingUpdate.value = false
   }
 }
+
+// 组件挂载时获取版本号
+onMounted(() => {
+  loadVersion()
+})
 </script>
 
 <style scoped>

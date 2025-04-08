@@ -100,7 +100,8 @@ export interface ElectronAPI {
   // 开发者工具
   toggleDevTools: () => Promise<void>
   
-  // 更新相关
+  // 版本相关
+  getAppVersion: () => Promise<string>
   checkForUpdates: () => Promise<{ hasUpdate: boolean; latestVersion: string; releaseNotes?: string }>
   
   // 快捷键检查

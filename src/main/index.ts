@@ -336,10 +336,10 @@ app.whenReady().then(async () => {
   // 配置自动更新
   if (!isDevelopment) {
     // 设置自动更新检查间隔（4小时）
-    const FOUR_HOURS = 4 * 60 * 60 * 1000
-    setInterval(() => {
-      checkForUpdates().catch(console.error)
-    }, FOUR_HOURS)
+    // const FOUR_HOURS = 4 * 60 * 60 * 1000
+    // setInterval(() => {
+    //   checkForUpdates().catch(console.error)
+    // }, FOUR_HOURS)
 
     // 首次启动时检查更新
     setTimeout(() => {
@@ -650,3 +650,8 @@ function createSettingsWindow() {
     settingsWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
 }
+
+// 获取应用版本号
+ipcMain.handle('get-app-version', () => {
+  return app.getVersion()
+})

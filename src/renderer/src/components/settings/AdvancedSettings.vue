@@ -8,9 +8,9 @@
         inactive-text="关闭"
         @change="handleChange"
       />
-      <div class="setting-tip">
+      <!-- <div class="setting-tip">
         开启后，选中文本时会自动生成回复
-      </div>
+      </div> -->
     </el-form-item>
 
     <el-form-item label="系统提示词">
