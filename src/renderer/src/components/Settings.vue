@@ -94,14 +94,16 @@ const DEFAULT_MODEL = {
 
 // 设置数据
 const settings = ref<StoredSettings>({
-  prompts: {},
+  prompts: {
+   
+  },
   shortcut: DEFAULT_SHORTCUT,
   conversations: [],
   models: {
     default: DEFAULT_MODEL
   },
   autoGenerate: false,
-  systemPrompt: '',
+  systemPrompt: '你现在是一位恋爱聊天助手，专门帮助直男解决恋爱中的聊天问题。请用温暖、真诚且富有技巧的语言回复以下内容。注意要展现出你的同理心、幽默感和解决问题的能力，同时保持真诚和风度。在对话中要体现出你的成熟稳重，能够巧妙化解矛盾，规避女生的试探风险，并维护健康的情感关系。',
   autoLaunch: false
 })
 

@@ -335,16 +335,7 @@ app.whenReady().then(async () => {
 
   // 配置自动更新
   if (!isDevelopment) {
-    // 设置自动更新检查间隔（4小时）
-    // const FOUR_HOURS = 4 * 60 * 60 * 1000
-    // setInterval(() => {
-    //   checkForUpdates().catch(console.error)
-    // }, FOUR_HOURS)
-
-    // 首次启动时检查更新
-    setTimeout(() => {
-      checkForUpdates().catch(console.error)
-    }, 10000) // 延迟10秒检查，等待应用完全启动
+    console.log('已禁用自动检查更新，仅保留手动检查功能')
   }
   
   app.on('activate', function () {
