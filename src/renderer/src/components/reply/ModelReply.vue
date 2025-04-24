@@ -195,12 +195,21 @@ async function selectReply(reply: string, index: number) {
   // 发射选择回复事件
   emit('select-reply', reply, index, props.model.id)
   
-  navigator.clipboard.writeText(reply).then(() => {
+  try {
+    // 使用主进程 API 复制到剪贴板
+    await window.electronAPI.copyToClipboard(reply)
+    // 显示复制成功状态
     copiedIndex.value = index
     setTimeout(() => {
       copiedIndex.value = -1
     }, 2000)
-  })
+  } catch (err) {
+    console.error('复制到剪贴板失败:', err)
+    error.value = '复制失败，请手动复制'
+    setTimeout(() => {
+      error.value = ''
+    }, 3000)
+  }
 }
 
 // 暴露方法给父组件

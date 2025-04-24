@@ -119,8 +119,9 @@ export interface ElectronAPI {
   // 导入设置
   importSettings: (mode: 'merge' | 'replace') => Promise<{ success: boolean; message: string }>
   
-  // 清空剪贴板
+  // 剪贴板操作
   clearClipboard: () => void
+  copyToClipboard: (text: string) => Promise<boolean>
 }
 
 // 更新信息类型

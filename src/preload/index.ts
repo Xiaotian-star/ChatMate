@@ -78,6 +78,9 @@ const api: ElectronAPI = {
   clearClipboard: () => {
     ipcRenderer.send('clear-clipboard')
   },
+  
+  // 复制到剪贴板
+  copyToClipboard: (text: string) => ipcRenderer.invoke('copy-to-clipboard', text),
 }
 
 // Use `contextBridge` APIs to expose Electron APIs to

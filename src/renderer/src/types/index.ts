@@ -51,6 +51,7 @@ export interface ElectronAPI {
   moveWindow: (deltaX: number, deltaY: number) => void
   getAutoLaunch: () => Promise<boolean>
   clearClipboard: () => void
+  copyToClipboard: (text: string) => Promise<boolean>
   onAutoGenerate: (callback: () => void) => () => void
   getAIResponse: (params: {
     text: string

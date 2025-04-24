@@ -30,7 +30,7 @@ let currentAutoGenerateShortcut: string | null = null
 // 显示设置窗口
 function showSettingsWindow() {
 
- 
+
   if (!settingsWindow || settingsWindow.isDestroyed()) {
     createSettingsWindow()
   } else {
@@ -46,12 +46,12 @@ function showSettingsWindow() {
 function createTray() {
   // 创建托盘图标
   const trayIcon = nativeImage.createFromPath(icon)
-  
-  
+
+
   // 调整图标大小为 16x16 (Windows) 或 18x18 (macOS)
   const iconSize = process.platform === 'darwin' ? 18 : 16
   const resizedIcon = trayIcon.resize({ width: iconSize, height: iconSize })
-  
+
   tray = new Tray(resizedIcon)
 
   // 创建托盘菜单
@@ -95,14 +95,14 @@ function createTray() {
 
   // 设置托盘提示文字
   tray.setToolTip('ChatMate')
-  
+
   // macOS 和 Windows 的托盘行为不同
   if (process.platform === 'darwin') {
     // macOS: 左键点击显示设置窗口
     tray.on('click', () => {
       showSettingsWindow()
     })
-    
+
     // 右键点击显示菜单
     tray.on('right-click', () => {
       tray?.popUpContextMenu(contextMenu)
@@ -112,7 +112,7 @@ function createTray() {
     tray.on('click', () => {
       showSettingsWindow()
     })
-    
+
     // 设置右键菜单
     tray.setContextMenu(contextMenu)
   }
@@ -122,7 +122,7 @@ function createTray() {
 const isShortcutRegistered = (shortcut: string): boolean => {
   try {
     // 尝试注册快捷键
-    const success = globalShortcut.register(shortcut, () => {})
+    const success = globalShortcut.register(shortcut, () => { })
     // 如果注册成功，立即注销
     if (success) {
       globalShortcut.unregister(shortcut)
@@ -198,14 +198,14 @@ const registerShortcuts = async () => {
       }
     }
 
-    
+
 
     // 如果两个快捷键都注册失败，返回 false
     if (settings.shortcut && !mainShortcutRegistered) {
       console.error('主快捷键注册失败')
       return false
     }
-  
+
 
     return true
   } catch (error) {
@@ -270,10 +270,10 @@ function createPopupWindow(): void {
   // 页面加载完成后的处理
   popupWindow.webContents.on('did-finish-load', () => {
     if (!popupWindow || popupWindow.isDestroyed()) return
-    
+
     // 先显示窗口
     popupWindow.show()
-    
+
     // 然后检查剪贴板
     const clipboardText = clipboard.readText()
     console.log('页面加载完成，读取到的剪贴板内容:', clipboardText)
@@ -315,16 +315,16 @@ app.whenReady().then(async () => {
   globalShortcut.unregisterAll()
   currentMainShortcut = null
   currentAutoGenerateShortcut = null
-  
+
   // 创建托盘
   createTray()
-  
+
   // 注册快捷键
   const registered = await registerShortcuts()
   if (!registered) {
     console.error('初始化快捷键注册失败')
   }
-  
+
   // 注册开发者工具快捷键
   globalShortcut.register('CommandOrControl+Shift+I', () => {
     const focusedWindow = BrowserWindow.getFocusedWindow()
@@ -337,7 +337,7 @@ app.whenReady().then(async () => {
   if (!isDevelopment) {
     console.log('已禁用自动检查更新，仅保留手动检查功能')
   }
-  
+
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) {
       showSettingsWindow()
@@ -386,7 +386,7 @@ ipcMain.handle('get-ai-response', async (_, params: AIRequestParams) => {
   try {
     // 获取 AI 回复
     const responses = await getAIResponse(params)
-    
+
     // 添加第一个 AI 回复到对话历史
     if (responses.length > 0) {
       messages.push({
@@ -419,17 +419,17 @@ ipcMain.handle('save-settings', async (_, settings: StoredSettings) => {
     // 保存当前快捷键状态
     const oldMainShortcut = currentMainShortcut
     const oldAutoGenerateShortcut = currentAutoGenerateShortcut
-    
+
     // 注销所有现有快捷键
     globalShortcut.unregisterAll()
-    
+
     // 清除当前快捷键记录
     currentMainShortcut = null
     currentAutoGenerateShortcut = null
-    
+
     // 保存设置
     await saveSettings(settings)
-    
+
     // 重新注册快捷键
     const registered = await registerShortcuts()
     if (!registered) {
@@ -453,7 +453,7 @@ ipcMain.handle('save-settings', async (_, settings: StoredSettings) => {
         })
         currentMainShortcut = oldMainShortcut
       }
-      
+
       if (oldAutoGenerateShortcut) {
         globalShortcut.register(oldAutoGenerateShortcut, () => {
           if (!popupWindow || popupWindow.isDestroyed()) {
@@ -465,10 +465,10 @@ ipcMain.handle('save-settings', async (_, settings: StoredSettings) => {
         })
         currentAutoGenerateShortcut = oldAutoGenerateShortcut
       }
-      
+
       throw new Error('快捷键注册失败')
     }
-    
+
     return true
   } catch (error) {
     console.error('保存设置失败:', error)
@@ -505,7 +505,7 @@ ipcMain.handle('set-auto-launch', async (_, enable: boolean) => {
       autoLaunch: enable
     }
     const success = await saveSettings(updatedSettings)
-    
+
     if (success) {
       // 根据操作系统设置自动启动
       if (process.platform === 'darwin') {
@@ -520,7 +520,7 @@ ipcMain.handle('set-auto-launch', async (_, enable: boolean) => {
         })
       }
     }
-    
+
     return success
   } catch (error) {
     console.error('设置自动启动失败:', error)
@@ -550,7 +550,7 @@ ipcMain.on('resize-window', (_, { deltaX, deltaY }) => {
   if (popupWindow) {
     // 获取当前窗口位置和大小
     const [currentX, currentY] = popupWindow.getPosition()
-    
+
     // 设置新的位置，保持大小不变
     popupWindow.setBounds({
       x: currentX + deltaX,
@@ -576,6 +576,19 @@ ipcMain.handle('check-shortcut-available', async (_event, shortcut: string) => {
 // 清空剪贴板
 ipcMain.on('clear-clipboard', () => {
   clipboard.writeText('')
+})
+
+// 复制到剪贴板
+ipcMain.handle('copy-to-clipboard', (_, text: string) => {
+  console.log('复制到剪贴板:', text)
+
+  try {
+    clipboard.writeText(text)
+    return true
+  } catch (error) {
+    console.error('复制到剪贴板失败:', error)
+    return false
+  }
 })
 
 function createSettingsWindow() {
